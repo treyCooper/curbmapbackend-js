@@ -1,0 +1,20 @@
+machine:
+  environment:
+    PATH: "${PATH}:${HOME}/${CIRCLE_PROJECT_REPONAME}/node_modules/.bin"
+  node:
+    version:
+      6.1.0
+dependencies:
+  cache_directories:
+    - ~/.cache/yarn
+  override:
+    - yarn
+    - cd ~/curbmapbackend-js && yarn install
+deployment:
+  production:
+    branch: master
+    commands:
+      - cd ~/curbmapbackend-js && tar -c -v --exclude node_modules -f curbmapbackend-js.tar *
+      - cd ~/curbmapbackend-js && bzip2 curbmapbackend-js.tar
+      - scp -r ~/curbmapbackend-js/curbmapbackend-js.tar.bz2 ec2-user@curbmap.com:~/tommydeploy/curbmapbackend-js/
+      - ssh ec2-user@curbmap.com "cd ~/tommydeploy && ./runscript.sh run > /dev/null &"
