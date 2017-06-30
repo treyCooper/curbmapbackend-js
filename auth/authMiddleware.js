@@ -4,6 +4,8 @@ function authenticationMiddleware (redisclient) {
         var sessionvalue = 'curbmap:sessions:'+req.headers.session;
         // The backend server is a VERY short term session (100 seconds)
         redisclient.get(sessionvalue, function (err, value) {
+            console.log(err)
+            console.log(value)
             if (err || value === null) {
                 res.redirect('/');
             } else {

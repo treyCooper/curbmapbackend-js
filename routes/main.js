@@ -10,7 +10,6 @@ var multer  = require('multer');
 var upload = multer({ limits: { fileSize: maxSize } });
 var Jimp = require("jimp");
 var passport = require('passport');
-require('dotenv').config({path: '../curbmap.env'});
 
 /**
  * This is a messy endpoint but it checks a lot of things
@@ -143,6 +142,7 @@ function api(app, redisclient) {
         if (findExists(req.session.role, levelUser)
             && req.query.lat1 !== undefined && req.query.lat2 !== undefined && req.query.lng1 !== undefined && req.query.lng2 !== undefined
         ) {
+          console.log(req.query)
             try {
                 let lng1 = parseFloat(req.query.lng1);
                 let lat1 = parseFloat(req.query.lat1);
