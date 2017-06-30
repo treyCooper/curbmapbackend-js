@@ -13,6 +13,7 @@ require('dotenv').config({path: '../curbmap.env'});
 var postgres = require('./model/postgresModels');
 var RedisStore = require('connect-redis')(session);
 var redis = require('redis').createClient(50005, '127.0.0.1');
+redis.auth(process.env.REDIS_PASSWORD);
 
 var app = express();
 
@@ -41,7 +42,6 @@ app.options('*', cors()); // include before other routes
 app.use(cors());
 app.use(logger('dev'));
 app.use(cookieParser());
-console.log("REDIS SECRET: " + process.env.REDIS_SECRET);
 // Session stuff
 app.use(session({
     store: new RedisStore({
