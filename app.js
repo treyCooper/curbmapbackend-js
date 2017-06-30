@@ -30,16 +30,14 @@ var whitelist = [
 ];
 var corsOptions = {
     origin: function (origin, callback) {
-        console.log("ORIGIN: "+origin);
         if (whitelist.indexOf('*') !== -1 || whitelist.indexOf(origin) !== -1) {
-            console.log("Whitelist");
             callback(null, true)
         } else {
             callback(new Error('Not allowed by CORS'))
         }
     }
 };
-app.options('*', cors(corsOptions)); // include before other routes
+app.options('*', cors()); // include before other routes
 app.use(cors(corsOptions));
 app.use(logger('dev'));
 app.use(cookieParser());
