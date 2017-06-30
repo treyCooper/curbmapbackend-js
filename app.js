@@ -38,7 +38,7 @@ var corsOptions = {
     }
 };
 app.options('*', cors()); // include before other routes
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(logger('dev'));
 app.use(cookieParser());
 console.log("REDIS SECRET: " + process.env.REDIS_SECRET);
