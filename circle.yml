@@ -17,4 +17,4 @@ deployment:
       - cd ~/curbmapbackend-js && tar -c -v --exclude node_modules -f curbmapbackend-js.tar *
       - cd ~/curbmapbackend-js && bzip2 curbmapbackend-js.tar
       - scp -r ~/curbmapbackend-js/curbmapbackend-js.tar.bz2 ec2-user@curbmap.com:~/tommydeploy/curbmapbackend-js/
-      - ssh ec2-user@curbmap.com "cd ~/tommydeploy && ./runscript.sh run > /dev/null &"
+      - ssh ec2-user@curbmap.com "cd ~/tommydeploy && ./runscript.sh build > /dev/null &"

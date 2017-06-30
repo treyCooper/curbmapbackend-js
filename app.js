@@ -31,7 +31,7 @@ var whitelist = [
 ];
 var corsOptions = {
     origin: function (origin, callback) {
-        console.log(origin);
+        console.log("ORIGIN: "+origin);
         if (whitelist.indexOf('*') !== -1 || whitelist.indexOf(origin) !== -1) {
             callback(null, true)
         } else {
@@ -43,7 +43,7 @@ app.options('*', cors(corsOptions)); // include before other routes
 app.use(cors(corsOptions));
 app.use(logger('dev'));
 app.use(cookieParser());
-
+console.log("REDIS SECRET: " + process.env.REDIS_SECRET);
 // Session stuff
 app.use(session({
     store: new RedisStore({
