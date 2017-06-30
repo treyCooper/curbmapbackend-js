@@ -24,7 +24,6 @@ app.set('view engine', 'pug');
 var whitelist = [
     'http://localhost:8080',
     'https://curbmap.com',
-    'curbmap.com',
     'https://curbmap.com:443',
     'http://curbmap.com:8080',
     '*'
@@ -33,6 +32,7 @@ var corsOptions = {
     origin: function (origin, callback) {
         console.log("ORIGIN: "+origin);
         if (whitelist.indexOf('*') !== -1 || whitelist.indexOf(origin) !== -1) {
+            console.log("Whitelist");
             callback(null, true)
         } else {
             callback(new Error('Not allowed by CORS'))
