@@ -12,6 +12,7 @@ function authenticationMiddleware (redisclient) {
                 req.session.role = othersession.role;
                 req.session.userid = othersession.userid;
                 found = true;
+                console.log("ROLE:"+req.session.role)
                 return next();
             }
         });
