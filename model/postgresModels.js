@@ -4,7 +4,7 @@ const uri = 'postgres://'+
     process.env.USERDB_USERNAME + ':' +
     process.env.USERDB_PASSWORD + '@' + process.env.POSTGRES_HOST +'/' + process.env.POSTGRES_DB
 const sequelize = new Sequelize(uri);
-console.log(uri);
+
 const User = sequelize.define('standard_user', {
     id_user: { type: Sequelize.STRING, primaryKey: true},
     active_account: { type: Sequelize.INTEGER, defaultValue: 1 },

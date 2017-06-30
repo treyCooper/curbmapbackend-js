@@ -38,8 +38,8 @@ var corsOptions = {
         }
     }
 };
-app.options('*', cors()); // include before other routes
-app.use(cors());
+app.options('*', cors(corsOptions)); // include before other routes
+app.use(cors(corsOptions));
 app.use(logger('dev'));
 app.use(cookieParser());
 // Session stuff

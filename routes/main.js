@@ -142,7 +142,6 @@ function api(app, redisclient) {
         if (findExists(req.session.role, levelUser)
             && req.query.lat1 !== undefined && req.query.lat2 !== undefined && req.query.lng1 !== undefined && req.query.lng2 !== undefined
         ) {
-          console.log(req.query)
             try {
                 let lng1 = parseFloat(req.query.lng1);
                 let lat1 = parseFloat(req.query.lat1);

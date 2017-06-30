@@ -11,7 +11,6 @@ mongoose.connect(uri, {
     },
     replset: { rs_name: process.env.MONGO_REPLSET }
 });
-console.log(uri)
 // mongoose.connect(uri);
 mongoose.Promise = require('bluebird');
 
