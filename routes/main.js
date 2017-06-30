@@ -10,7 +10,7 @@ var multer  = require('multer');
 var upload = multer({ limits: { fileSize: maxSize } });
 var Jimp = require("jimp");
 var passport = require('passport');
-require('dotenv').config({path: '../../curbmap.env'});
+require('dotenv').config({path: '../curbmap.env'});
 
 /**
  * This is a messy endpoint but it checks a lot of things
@@ -324,4 +324,3 @@ var processResults = function(results) {
 
 
 module.exports = api;
-

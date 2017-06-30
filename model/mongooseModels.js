@@ -1,6 +1,6 @@
 var mongoose = require('mongoose');
 var GeoJSON = require('mongoose-geojson-schema');
-require('dotenv').config({path: '../../curbmap.env'});
+require('dotenv').config({path: '../curbmap.env'});
 var uri = 'mongodb://' + process.env.MONGO_SHARD_0 + ',' + process.env.MONGO_SHARD_1 + ',' + process.env.MONGO_SHARD_2 +
         '/' + process.env.MONGO_DB + '?ssl=true';
 mongoose.connect(uri, {
