@@ -1,0 +1,19 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: curbmap/fedora-node:v0.0.2
+    working_directory: ~/curbmapbackend-js
+    branches:
+      only:
+        - master
+    steps:
+      - checkout
+      - run: yarn install
+      - run: tar -c -v --exclude node_modules -f curbmapbackend-js.tar *
+      - run: bzip2 curbmapbackend-js.tar
+      - deploy:
+          name: The Joker
+          command:  |
+            scp -o StrictHostKeyChecking=no curbmapbackend-js.tar.bz2 ec2-user@curbmap.com:~/tommydeploy/curbmapbackend-js/
+            ssh -o StrictHostKeyChecking=no ec2-user@curbmap.com "cd ~/tommydeploy && ./runscript.sh build > /dev/null &"

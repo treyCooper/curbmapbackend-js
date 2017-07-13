@@ -1,7 +1,7 @@
 module.exports = {
-    extends: 'airbnb',
-    parser: 'babel-eslint', // needed for class properties
-    rules: {
-        semi: ['error', 'never'],
-    },
-}
+    "plugins": ["node"],
+    "extends": ["eslint:recommended", "plugin:node/recommended"],
+    "rules": {
+        "node/exports-style": ["error", "module.exports"],
+    }
+};

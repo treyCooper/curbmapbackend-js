@@ -1,5 +1,3 @@
-var express = require('express');
-var util = require('util');
 var geolib = require('geolib');
 var atob = require('atob');
 var mongooseModels = require("../model/mongooseModels.js");
