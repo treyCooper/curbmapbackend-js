@@ -1,18 +1,22 @@
-var express = require('express');
-var session = require('express-session');
-var path = require('path');
-var favicon = require('serve-favicon');
-var logger = require('morgan');
+'use strict';
+const express = require('express');
+const session = require('express-session');
+const path = require('path');
+const logger = require('morgan');
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
-var fs = require('fs');
-var cors = require('cors');
+const cookieParser = require('cookie-parser');
+const bodyParser = require('body-parser');
+const fs = require('fs');
+const cors = require('cors');
 require('dotenv').config({path: '../curbmap.env'});
-var postgres = require('./model/postgresModels');
-var RedisStore = require('connect-redis')(session);
-var redis = require('redis').createClient(50005, '127.0.0.1');
+const postgres = require('./model/postgresModels');
+const RedisStore = require('connect-redis')(session);
+const redis = require('redis').createClient(50005, '127.0.0.1');
+const compression = require('compression');
+const winston = require('winston');
+const bcrypt = require('bcrypt');
+
 redis.auth(process.env.REDIS_PASSWORD);
 
 var app = express();
@@ -31,6 +35,7 @@ var whitelist = [
 ];
 var corsOptions = {
     origin: function (origin, callback) {
+        winston.log('info', "origin: ", origin);
         if (whitelist.indexOf('*') !== -1 || whitelist.indexOf(origin) !== -1) {
             callback(null, true)
         } else {
@@ -38,10 +43,23 @@ var corsOptions = {
         }
     }
 };
+
 app.options('*', cors(corsOptions)); // include before other routes
 app.use(cors(corsOptions));
 app.use(logger('dev'));
 app.use(cookieParser());
+app.use(compression({filter: shouldCompress});
+
+function shouldCompress (req, res) {
+    if (req.headers['x-no-compression']) {
+        // don't compress responses with this request header
+        return false
+    }
+
+    // fallback to standard filter function
+    return compression.filter(req, res)
+}
+
 // Session stuff
 app.use(session({
     store: new RedisStore({
@@ -104,18 +122,18 @@ require('./routes/index').init(app, redis);
 
 // routes can also get the body
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({extended: false}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
     var err = new Error('Not Found');
     err.status = 404;
     next(err);
 });
 
 // error handler
-app.use(function(err, req, res, next) {
+app.use(function (err, req, res, next) {
     // set locals, only providing error in development
     res.locals.message = err.message;
     res.locals.error = req.app.get('env') === 'development' ? err : {};
