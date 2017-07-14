@@ -1,13 +1,14 @@
-var geolib = require('geolib');
-var atob = require('atob');
-var mongooseModels = require("../model/mongooseModels.js");
-var postgres = require('../model/postgresModels');
-var levelUser = "ROLE_USER";
-var maxSize = 2 * 1000 * 1000;
-var multer  = require('multer');
-var upload = multer({ limits: { fileSize: maxSize } });
-var Jimp = require("jimp");
-var passport = require('passport');
+const geolib = require('geolib');
+const atob = require('atob');
+const mongooseModels = require("../model/mongooseModels.js");
+const postgres = require('../model/postgresModels');
+const levelUser = "ROLE_USER";
+const maxSize = 2 * 1000 * 1000;
+const multer  = require('multer');
+const upload = multer({ limits: { fileSize: maxSize } });
+const Jimp = require("jimp");
+const passport = require('passport');
+const winston = require('winston');
 
 /**
  * This is a messy endpoint but it checks a lot of things
@@ -137,6 +138,7 @@ function api(app, redisclient) {
     });
 
     app.get('/areaPolygon', passport.authMiddleware(redisclient), function (req, res, next) {
+        const time_start = new Date().getTime();
         if (findExists(req.session.role, levelUser)
             && req.query.lat1 !== undefined && req.query.lat2 !== undefined && req.query.lng1 !== undefined && req.query.lng2 !== undefined
         ) {
@@ -206,6 +208,8 @@ function api(app, redisclient) {
                                 // console.log(util.inspect(result, {depth: null}));
                                 var results_to_send = processResults(result);
                                 res.json(results_to_send);
+                                const time_end = new Date().getTime()
+                                winston.log('warn', 'timeelapsed in processing', {results_length: results_to_send.length, time: time_end-time_start})
                             } catch (e) {
                                 console.log(e)
                             }
