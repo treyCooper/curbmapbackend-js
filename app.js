@@ -48,7 +48,7 @@ app.options('*', cors(corsOptions)); // include before other routes
 app.use(cors(corsOptions));
 app.use(logger('dev'));
 app.use(cookieParser());
-app.use(compression({filter: shouldCompress});
+app.use(compression({filter: shouldCompress}));
 
 function shouldCompress (req, res) {
     if (req.headers['x-no-compression']) {
