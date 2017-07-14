@@ -301,6 +301,7 @@ var processResults = function(results) {
             "points": [],
             "restrs": []
         };
+        newResponse["key"] results[result].gid;
 
         // results is an array, [] here is related to index value not key/value
         for (var point in results[result].points) {
