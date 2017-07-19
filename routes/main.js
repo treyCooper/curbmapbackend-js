@@ -159,72 +159,67 @@ function api(app, redisclient) {
           {longitude: upper[0], latitude: upper[1]}); // keep the distance to one dimension
         winston.log('info', 'DISTANCE:', {distance: distance} );
         // diagonal distance in the view
-        if (distance < 5000 || user !== undefined) {
-          if (user === req.session.passport.user) {
-            var query = mongooseModels.model.find({
-              "loc": {
-                "$geoIntersects": {
-                  "$geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                      [lower[0], lower[1]],
-                      [lower[0], upper[1]],
-                      [upper[0], upper[1]],
-                      [upper[0], lower[1]],
-                      [lower[0], lower[1]]
-                    ]]
-                  }
-                }
-              },
-              "points.restrs": {
-                "$elemMatch": {
-                  b: req.session.userid
+        if (distance < 5000 || (user !== undefined && user  === req.session.passport.user)) {
+          var query = mongooseModels.model.find({
+            "loc": {
+              "$geoIntersects": {
+                "$geometry": {
+                  "type": "Polygon",
+                  "coordinates": [[
+                    [lower[0], lower[1]],
+                    [lower[0], upper[1]],
+                    [upper[0], upper[1]],
+                    [upper[0], lower[1]],
+                    [lower[0], lower[1]]
+                  ]]
                 }
               }
-            });
-            query.exec(function (err, result) {
-              try {
-                                // winston.log('info', util.inspect(result, {depth: null}));
-                var results_to_send = processResults(result);
-                res.json(results_to_send, true);
-              } catch (e) {
-                winston.log(e)
+            },
+            "points.restrs": {
+              "$elemMatch": {
+                b: req.session.userid
               }
-            });
-          } else {
-            var query = mongooseModels.model.find({
-              "loc": {
-                "$geoIntersects": {
-                  "$geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                                            [lower[0], lower[1]],
-                                            [lower[0], upper[1]],
-                                            [upper[0], upper[1]],
-                                            [upper[0], lower[1]],
-                                            [lower[0], lower[1]]
-                    ]]
-                  }
+            }
+          });
+          query.exec(function (err, result) {
+            try {
+                              // winston.log('info', util.inspect(result, {depth: null}));
+              var results_to_send = processResults(result);
+              res.json(results_to_send, true);
+            } catch (e) {
+              winston.log(e)
+            }
+          });
+        } else {
+          var query = mongooseModels.model.find({
+            "loc": {
+              "$geoIntersects": {
+                "$geometry": {
+                  "type": "Polygon",
+                  "coordinates": [[
+                    [lower[0], lower[1]],
+                    [lower[0], upper[1]],
+                    [upper[0], upper[1]],
+                    [upper[0], lower[1]],
+                    [lower[0], lower[1]]
+                  ]]
                 }
               }
-            });
-            query.exec(function (err, result) {
-              try {
-                const time_end_results = new Date().getTime()
-                winston.log('warn', 'time elapsed in mongo', {results_from_mongo: result.length, time: time_end_results-time_start})
-                                // winston.log('info', util.inspect(result, {depth: null}));
-                var results_to_send = processResults(result, false);
-                res.json(results_to_send);
-                const time_end = new Date().getTime()
-                winston.log('warn', 'time elapsed in processing', {results_length: results_to_send.length, time: time_end-time_end_results})
-              } catch (e) {
-                winston.log('info', e)
-              }
-            });
-          }
-        }
-        else {
-          res.json({});
+            }
+          });
+          query.exec(function (err, result) {
+            try {
+              const time_end_results = new Date().getTime()
+              winston.log('warn', 'time elapsed in mongo', {results_from_mongo: result.length, time: time_end_results-time_start})
+                              // winston.log('info', util.inspect(result, {depth: null}));
+              var results_to_send = processResults(result, false);
+              res.json(results_to_send);
+              const time_end = new Date().getTime()
+              winston.log('warn', 'time elapsed in processing', {results_length: results_to_send.length, time: time_end-time_end_results})
+            } catch (e) {
+              winston.log('info', e)
+            }
+          });
         }
       } catch (e) {
         winston.log('info', "Error: " + e);
