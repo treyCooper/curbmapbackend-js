@@ -205,11 +205,13 @@ function api(app, redisclient) {
                         });
                         query.exec(function (err, result) {
                             try {
+                                const time_end_results = new Date().getTime()
+                                winston.log('warn', 'time elapsed in mongo', {results_from_mongo: result.length, time: time_end_results-time_start})
                                 // console.log(util.inspect(result, {depth: null}));
                                 var results_to_send = processResults(result);
                                 res.json(results_to_send);
                                 const time_end = new Date().getTime()
-                                winston.log('warn', 'timeelapsed in processing', {results_length: results_to_send.length, time: time_end-time_start})
+                                winston.log('warn', 'time elapsed in processing', {results_length: results_to_send.length, time: time_end-time_end_results})
                             } catch (e) {
                                 console.log(e)
                             }
