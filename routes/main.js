@@ -181,11 +181,7 @@ function api(app, redisclient) {
                             try {
                                 // console.log(util.inspect(result, {depth: null}));
                                 var results_to_send = processResults(result);
-                                if (distance < 1000) {
                                     res.json(results_to_send, true);
-                                } else {
-                                    res.json(results_to_send, false);
-                                }
                             } catch (e) {
                                 console.log(e)
                             }
