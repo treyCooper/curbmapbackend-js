@@ -1,3 +1,4 @@
+'use strict';
 const geolib = require('geolib');
 const atob = require('atob');
 const mongooseModels = require("../model/mongooseModels.js");
@@ -147,14 +148,14 @@ function api(app, redisclient) {
             && req.query.lat1 !== undefined && req.query.lat2 !== undefined && req.query.lng1 !== undefined && req.query.lng2 !== undefined
         ) {
       try {
-        let lng1 = parseFloat(req.query.lng1);
-        let lat1 = parseFloat(req.query.lat1);
-        let lng2 = parseFloat(req.query.lng2);
-        let lat2 = parseFloat(req.query.lat2);
-        let user = req.query.user;
-        var lower = [lng1, lat1];
-        var upper = [lng2, lat2];
-        var distance = geolib.getDistance(
+        const lng1 = parseFloat(req.query.lng1);
+        const lat1 = parseFloat(req.query.lat1);
+        const lng2 = parseFloat(req.query.lng2);
+        const lat2 = parseFloat(req.query.lat2);
+        const user = req.query.user;
+        const lower = [lng1, lat1];
+        const upper = [lng2, lat2];
+        const distance = geolib.getDistance(
           {longitude: lower[0], latitude: upper[1]},
           {longitude: upper[0], latitude: upper[1]}); // keep the distance to one dimension
         winston.log('info', 'DISTANCE:', {distance: distance} );
@@ -184,7 +185,12 @@ function api(app, redisclient) {
           query.exec(function (err, result) {
             try {
                               // winston.log('info', util.inspect(result, {depth: null}));
-              var results_to_send = processResults(result);
+              let results_to_send;
+              if (distance < 1500) {
+                results_to_send = processResults(result, true);
+              } else {
+                results_to_send = processResults(result, false);
+              }
               res.json(results_to_send, true);
             } catch (e) {
               winston.log(e)
