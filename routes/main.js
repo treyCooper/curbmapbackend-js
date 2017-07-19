@@ -181,7 +181,11 @@ function api(app, redisclient) {
                             try {
                                 // console.log(util.inspect(result, {depth: null}));
                                 var results_to_send = processResults(result);
-                                res.json(results_to_send);
+                                if (distance < 1000) {
+                                    res.json(results_to_send, true);
+                                } else {
+                                    res.json(results_to_send, false);
+                                }
                             } catch (e) {
                                 console.log(e)
                             }
@@ -208,7 +212,7 @@ function api(app, redisclient) {
                                 const time_end_results = new Date().getTime()
                                 winston.log('warn', 'time elapsed in mongo', {results_from_mongo: result.length, time: time_end_results-time_start})
                                 // console.log(util.inspect(result, {depth: null}));
-                                var results_to_send = processResults(result);
+                                var results_to_send = processResults(result, false);
                                 res.json(results_to_send);
                                 const time_end = new Date().getTime()
                                 winston.log('warn', 'time elapsed in processing', {results_length: results_to_send.length, time: time_end-time_end_results})
@@ -293,9 +297,11 @@ var findExists = function (haystack, needle) {
  * @param results, JSON from mongo
  * @returns {Array}
  */
-var processResults = function(results) {
+var processResults = function(results, points) {
     var returnResults = [];
     for (var result in results) {
+        if (results[result].points.length === 0 && results[result].restrs.length === 0)
+            continue
         var newResponse = {};
         newResponse["coordinates"] = results[result].loc.coordinates;
         newResponse["restrs"] = results[result].restrs;
@@ -304,20 +310,21 @@ var processResults = function(results) {
             "restrs": []
         };
         newResponse["key"] = results[result].gid;
-
-        // results is an array, [] here is related to index value not key/value
-        for (var point in results[result].points) {
-            if (results[result].points[point].point !== [] &&
-                results[result].points[point].point !== null &&
-                results[result].points[point].point !== undefined &&
-                results[result].points[point].restrs !== undefined
-            ) {
-                newResponse.multiPointProperties.points.push(results[result].points[point].point);
-                var newRestr = [];
-                results[result].points[point].restrs.forEach(function (restr, idx) {
-                    newRestr.push(restr['t'], restr['d'], restr['r'],restr['s'], restr['e'], restr['c'], restr['l'], restr['p']); // take out user id
-                });
-                newResponse.multiPointProperties.restrs.push(newRestr);
+        if (points) {
+            // results is an array, [] here is related to index value not key/value
+            for (var point in results[result].points) {
+                if (results[result].points[point].point !== [] &&
+                    results[result].points[point].point !== null &&
+                    results[result].points[point].point !== undefined &&
+                    results[result].points[point].restrs !== undefined
+                ) {
+                    newResponse.multiPointProperties.points.push(results[result].points[point].point);
+                    var newRestr = [];
+                    results[result].points[point].restrs.forEach(function (restr, idx) {
+                        newRestr.push(restr['t'], restr['d'], restr['r'], restr['s'], restr['e'], restr['c'], restr['l'], restr['p']); // take out user id
+                    });
+                    newResponse.multiPointProperties.restrs.push(newRestr);
+                }
             }
         }
         returnResults.push(newResponse)
