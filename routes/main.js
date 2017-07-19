@@ -160,7 +160,7 @@ function api(app, redisclient) {
           {longitude: upper[0], latitude: upper[1]}); // keep the distance to one dimension
         winston.log('info', 'DISTANCE:', {distance: distance} );
         // diagonal distance in the view
-        if (distance < 5000 || (user !== undefined && user  === req.session.passport.user)) {
+        if (user !== undefined && user  === req.session.passport.user) {
           var query = mongooseModels.model.find({
             "loc": {
               "$geoIntersects": {
@@ -186,17 +186,13 @@ function api(app, redisclient) {
             try {
                               // winston.log('info', util.inspect(result, {depth: null}));
               let results_to_send;
-              if (distance < 1500) {
-                results_to_send = processResults(result, true);
-              } else {
-                results_to_send = processResults(result, false);
-              }
-              res.json(results_to_send, true);
+              results_to_send = processResults(result, true);
+              res.status(200).json(results_to_send);
             } catch (e) {
               winston.log(e)
             }
           });
-        } else {
+        } else if (distance < 5000) {
           var query = mongooseModels.model.find({
             "loc": {
               "$geoIntersects": {
@@ -218,9 +214,14 @@ function api(app, redisclient) {
               const time_end_results = new Date().getTime()
               winston.log('warn', 'time elapsed in mongo', {results_from_mongo: result.length, time: time_end_results-time_start})
                               // winston.log('info', util.inspect(result, {depth: null}));
-              var results_to_send = processResults(result, false);
-              res.json(results_to_send);
-              const time_end = new Date().getTime()
+              let results_to_send;
+              if (distance < 1500) {
+                results_to_send = processResults(result, true);
+              } else {
+                results_to_send = processResults(result, false);
+              }
+              res.status(200).json(results_to_send);
+              const time_end = new Date().getTime();
               winston.log('warn', 'time elapsed in processing', {results_length: results_to_send.length, time: time_end-time_end_results})
             } catch (e) {
               winston.log('info', e)
