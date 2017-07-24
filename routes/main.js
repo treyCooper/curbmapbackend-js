@@ -328,7 +328,7 @@ var processResults = function(results, points) {
           newResponse.multiPointProperties.points.push(results[result].points[point].point);
           var newRestr = [];
           results[result].points[point].restrs.forEach(function (restr, idx) {
-            newRestr.push(restr['t'], restr['d'], restr['r'], restr['s'], restr['e'], restr['c'], restr['l'], restr['p']); // take out user id
+            newRestr.push(restr['t'], restr['d'], restr['s'], restr['e'], restr['r'], restr['l'], restr['c'], restr['p']); // take out user id
           });
           newResponse.multiPointProperties.restrs.push(newRestr);
         }
