@@ -3,7 +3,11 @@ const geolib = require('geolib');
 const atob = require('atob');
 const mongooseModels = require("../model/mongooseModels.js");
 const postgres = require('../model/postgresModels');
-const levelUser = "ROLE_USER";
+const levels = {
+  user: ["ROLE_USER", "ROLE_ADMIN", "ROLE_OWNER"],
+  admin: ["ROLE_ADMIN", "ROLE_OWNER"],
+  owner: ["ROLE_OWNER"],
+};
 const maxSize = 2 * 1000 * 1000;
 const multer  = require('multer');
 const upload = multer({ limits: { fileSize: maxSize } });
@@ -117,7 +121,7 @@ function api(app, redisclient) {
   });
 
   app.post('/imageUpload', passport.authMiddleware(redisclient), upload.single('image'), function (req, res, next) {
-    if (findExists(req.session.role, levelUser)) {
+    if (findExists(req.session.role, levels.user)) {
       try {
         Jimp.read(req.file.buffer, function (err, image) {
           if (err) {
@@ -144,7 +148,7 @@ function api(app, redisclient) {
 
   app.get('/areaPolygon', passport.authMiddleware(redisclient), function (req, res, next) {
     const time_start = new Date().getTime();
-    if (findExists(req.session.role, levelUser)
+    if (findExists(req.session.role, levels.user)
             && req.query.lat1 !== undefined && req.query.lat2 !== undefined && req.query.lng1 !== undefined && req.query.lng2 !== undefined
         ) {
       try {
@@ -239,7 +243,7 @@ function api(app, redisclient) {
   });
 
   app.get('/areaCircle', passport.authMiddleware(redisclient), function (req, res, next) {
-    if (req.user.aud[0] === "curbmap-resource" && findExists(req.user.authorities, levelUser)) {
+    if (req.user.aud[0] === "curbmap-resource" && findExists(req.user.authorities, levels.user)) {
       var center = [req.query.lng, req.query.lat];
       var rad = req.query.rad;
       winston.log('info', rad);
@@ -268,7 +272,7 @@ function api(app, redisclient) {
   });
 }
 
-var findExists = function (haystack, needle) {
+var findExists = function (needle, haystack) {
   return haystack.indexOf(needle) >= 0;
 };
 
