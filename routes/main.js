@@ -196,7 +196,7 @@ function api(app, redisclient) {
               winston.log(e)
             }
           });
-        } else if (distance < 5000) {
+        } else if (distance < 3000) {
           var query = mongooseModels.model.find({
             "loc": {
               "$geoIntersects": {
@@ -219,7 +219,7 @@ function api(app, redisclient) {
               winston.log('warn', 'time elapsed in mongo', {results_from_mongo: result.length, time: time_end_results-time_start})
                               // winston.log('info', util.inspect(result, {depth: null}));
               let results_to_send;
-              if (distance < 1500) {
+              if (distance < 1200) {
                 results_to_send = processResults(result, true);
               } else {
                 results_to_send = processResults(result, false);
