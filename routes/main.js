@@ -24,7 +24,7 @@ const winston = require('winston');
  * Fourth: We add the point to the user's list of points_created in the points table
  */
 function api(app, redisclient) {
-  app.get('/addPoint', passport.authMiddleware(redisclient), function (req, res, next) {
+  app.post('/addPoint', passport.authMiddleware(redisclient), function (req, res, next) {
     if (req.query.lat !== undefined && req.query.lng !== undefined && req.query.rule !== undefined) {
       try {
         var lat = parseFloat(req.query.lat);
@@ -118,6 +118,14 @@ function api(app, redisclient) {
         res.json({"success": false});
       }
     }
+  });
+  app.post('/upVote', passport.authMiddleware(redisclient), function (req, res, next) {
+    winston.log('info', 'upVote', {body: req.body, headers: req.header});
+    // TODO: MUST WRITE up Voting of restriction
+  });
+  app.post('/downVote', passport.authMiddleware(redisclient), function (req, res, next) {
+    winston.log('info', 'downVote', {body: req.body, headers: req.header});
+    // TODO: MUST WRITE Down Voting of restriction
   });
 
   app.post('/imageUpload', passport.authMiddleware(redisclient), upload.single('image'), function (req, res, next) {
