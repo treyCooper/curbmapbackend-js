@@ -15,6 +15,7 @@ mongoose.connect(uri, {
 mongoose.Promise = require('bluebird');
 
 var RestrSchema = new mongoose.Schema({
+  "i": String,    // id
   "t": String,    // type
   "d": String,    // days
   "s": String,    // start
@@ -50,7 +51,7 @@ var MapLineSchema = new mongoose.Schema({
   "odd_l": Boolean,
   "loc": {type: mongoose.Schema.Types.LineString, index: '2dsphere'},
   "points": [PointsSchema],
-  "restrs": [[String]]
+  "restrs": [RestrSchema]
 }, {collection: 'MapLines'});
 
 var MapLines = mongoose.model('MapLines', MapLineSchema);
