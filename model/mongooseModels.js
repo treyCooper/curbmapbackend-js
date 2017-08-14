@@ -1,7 +1,8 @@
-var mongoose = require('mongoose');
-var GeoJSON = require('mongoose-geojson-schema');
+'use strict';
+const mongoose = require('mongoose');
+const GeoJSON = require('mongoose-geojson-schema');
 require('dotenv').config({path: '../curbmap.env'});
-var uri = 'mongodb://' + process.env.MONGO_SHARD_0 + ',' + process.env.MONGO_SHARD_1 + ',' + process.env.MONGO_SHARD_2 +
+const uri = 'mongodb://' + process.env.MONGO_SHARD_0 + ',' + process.env.MONGO_SHARD_1 + ',' + process.env.MONGO_SHARD_2 +
         '/' + process.env.MONGO_DB + '?ssl=true';
 mongoose.connect(uri, {
   user: process.env.MAPDB_USERNAME,
@@ -14,27 +15,29 @@ mongoose.connect(uri, {
 // mongoose.connect(uri);
 mongoose.Promise = require('bluebird');
 
-var RestrSchema = new mongoose.Schema({
+const RestrSchema = new mongoose.Schema({
   "i": String,    // id
   "t": String,    // type
-  "d": String,    // days
-  "s": String,    // start
-  "e": String,    // end
-  "u": String,    // updatedOn
+  "d": [Boolean], // days
+  "s": Number,    // start
+  "e": Number,    // end
+  "u": Number,    // updatedOn
   "b": String,    // by user id
   "c": Number,    // cost
   "l": Number,    // limit
   "p": Number,    // per
+  "an": Number,   // angle
   "up": Number,   // upVotes
   "dn": Number    // downVotes
 });
 
-var PointsSchema = new mongoose.Schema({
+const PointsSchema = new mongoose.Schema({
+  "point_id": mongoose.Schema.Types.ObjectId,
   "point": [Number, Number],
   "restrs": [RestrSchema]
 });
 
-var MapLineSchema = new mongoose.Schema({
+const MapLineSchema = new mongoose.Schema({
   "gid": Number,
   "cams_id": Number,
   "fullname": String,
@@ -54,6 +57,6 @@ var MapLineSchema = new mongoose.Schema({
   "restrs": [RestrSchema]
 }, {collection: 'MapLines'});
 
-var MapLines = mongoose.model('MapLines', MapLineSchema);
+const MapLines = mongoose.model('MapLines', MapLineSchema);
 
 module.exports.model = MapLines;
