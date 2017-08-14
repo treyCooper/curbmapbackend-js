@@ -3,6 +3,7 @@ const geolib = require('geolib');
 const atob = require('atob');
 const mongooseModels = require("../model/mongooseModels.js");
 const postgres = require('../model/postgresModels');
+const uuidv1 = require('uuid/v1');
 const levels = {
   user: ["ROLE_USER", "ROLE_ADMIN", "ROLE_OWNER"],
   admin: ["ROLE_ADMIN", "ROLE_OWNER"],
@@ -24,100 +25,158 @@ const winston = require('winston');
  * Fourth: We add the point to the user's list of points_created in the points table
  */
 function api(app, redisclient) {
-  app.get('/addPoint', passport.authMiddleware(redisclient), function (req, res, next) {
-    if (req.query.lat !== undefined && req.query.lng !== undefined && req.query.rule !== undefined) {
-      try {
-        var lat = parseFloat(req.query.lat);
-        var lng = parseFloat(req.query.lng);
-        var rule = atob(req.query.rule).split(",");
-        if (rule < 4) {
-          res.json({"success": false});
-          return;
-        }
-                // Query for line within 20 meters
-        var query = mongooseModels.model.aggregate([
-          {
-            "$geoNear": {
-              "near": {
-                "type": "Point",
-                "coordinates": [lng, lat]
-              },
-              "distanceField": "distance",
-              "spherical": true,
-              "maxDistance": 20
-            }
-          },
-                    {"$limit": 1}
-        ]);
-        query.exec(function (err, result) {
-                    // If no result!
-          if (result[0] === undefined) {
-            res.json({"success": false});
-            return;
-          }
-                    // Or if an error in the result
-          if (err) {
-            res.json({"success": false});
-            return;
-          }
-          id = result[0]['_id'];
-          var date = new Date();
-          var temp = {
-            t: rule[0],
-            d: rule[1],
-            s: rule[2],
-            e: rule[3],
-            u: date.toISOString(),
-            b: req.user.user_id,
-            r: 0.6,
-            l: 0,
-            c: 0.0,
-            p: 0
-          };
-          if (rule.length >= 5) {
-            temp['l'] = rule[4];
-          }
-          if (rule.length === 7) {
-            temp['c'] = rule[5];
-            temp['p'] = rule[6];
-          }
-          var update = mongooseModels.model.findOneAndUpdate(
-            {"_id": id},
+  app.post('/addPoint', passport.authMiddleware(redisclient), function (req, res, next) {
+    winston.log('warn', 'addPoint', typeof req.body.point.lat);
+    {
+      if (req.body.point.lat !== undefined && req.body.point.lng !== undefined && req.body.restriction.length >= 1) {
+        try {
+          // Query for line within 20 meters
+          var query = mongooseModels.model.aggregate([
             {
-              "$push": {
-                "points": {
-                  "point": [lng, lat], "restrs": [temp]
-                }
+              "$geoNear": {
+                "near": {
+                  "type": "Point",
+                  "coordinates": [req.body.point.lng, req.body.point.lat]
+                },
+                "distanceField": "distance",
+                "spherical": true,
+                "maxDistance": 20
               }
             },
-            {upsert: true}
-          );
-          update.exec(function (err, resultupdated) {
-            if (err) throw new Error("could not update line");
-            postgres.Point.findOne({where: {user_id: req.user.user_id}}).then(function (userPoints) {
-              if (userPoints !== null) {
-                var newPoints = userPoints.points_created;
-                winston.log('info', typeof newPoints);
-                postgres.addToPoints({
-                  "point": [lng, lat],
-                  "restrs": [temp]
-                }, req.user.user_id, res);
-              } else {
-                postgres.Point.build({
-                  user_id: req.user.user_id,
-                  points_created: [{"point": [lng, lat], "restrs": [temp]}]
-                }).save().then(function () {
-                  res.json({"success": true});
-                })
+            {"$limit": 1}
+          ]);
+          query.exec(function (err, result) {
+            // If no result!
+            if (result[0] === undefined) {
+              res.json({"success": false});
+              return;
+            }
+            // Or if an error in the result
+            if (err) {
+              res.json({"success": false});
+              return;
+            }
+            let id = result[0]['_id'];
+            // don't duplicate points
+            for (let pointTemp of result[0].points) {
+              if (pointTemp.point[0] === req.body.point.lng && pointTemp.point[1] === req.body.point.lat){
+                res.json({"success": false, "reason": "point exists"});
+                return;
               }
-            })
-          });
-        })
-      } catch (error) {
-        winston.log('info', "Error" + error);
-        res.json({"success": false});
+            }
+            let date = new Date();
+            let restrs = [];
+            for (let rule of req.body.restriction) {
+              let temp = {
+                i: uuidv1(),
+                t: rule['type'],
+                d: rule['days'],
+                s: rule['startTime'],
+                e: rule['endTime'],
+                u: date.getTime(),
+                b: req.session.userid,
+                l: rule['timeLimit'] === undefined ? 0 : rule['timeLimit'],
+                c: rule['cost'] === undefined ? 0 : rule['cost'],
+                p: rule['per'] === undefined ? 0 : rule['per'],
+                up: 1,
+                dn: 0,
+                an: rule['angle']
+              };
+              restrs.push(temp);
+            }
+            var update = mongooseModels.model.findOneAndUpdate(
+              {"_id": id},
+              {
+                "$push": {
+                  "points": {
+                    "point": [req.body.point.lng, req.body.point.lat], "restrs": restrs
+                  }
+                }
+              },
+              {upsert: true}
+            );
+            update.exec(function (err, resultupdated) {
+              if (err) throw new Error("could not update line");
+              postgres.Point.findOne({where: {user_id: req.session.userid}}).then(function (userPoints) {
+                if (userPoints !== null) {
+                  var newPoints = userPoints.points_created;
+                  winston.log('info', typeof newPoints);
+                  postgres.addToPoints({
+                    "point": [req.body.point.lng, req.body.point.lat],
+                    "restrs": restrs
+                  }, req.session.userid, res);
+                } else {
+                  postgres.Point.build({
+                    user_id: req.session.userid,
+                    points_created: [{"point": [req.body.point.lng, req.body.point.lat], "restrs": restrs}]
+                  }).save().then(function () {
+                    res.json({"success": true});
+                  })
+                }
+              })
+            });
+          })
+        } catch (error) {
+          winston.log('info', "Error" + error);
+          res.json({"success": false});
+        }
       }
     }
+  });
+  app.post('/upVote', passport.authMiddleware(redisclient), function (req, res, next) {
+
+    if (req.session.passport.user === 'curbmaptest') {
+      return next();
+    }
+
+    // TODO: MUST WRITE up Voting of restriction
+  });
+  app.post('/downVote', passport.authMiddleware(redisclient), function (req, res, next) {
+    winston.log('info', 'downVote', {body: req.body, headers: req.header});
+    // TODO: MUST WRITE Down Voting of restriction
+  });
+
+  app.post('/addPointRestr', passport.authMiddleware(redisclient), function (req, res, next) {
+    winston.log('info', req.body);
+    let rules = [];
+    let newRestrs = [];
+    let date = new Date();
+    for (let rule of req.body.restrs) {
+      let temp = {
+        i: uuidv1(),
+        t: rule['type'],
+        d: rule['days'],
+        s: rule['startTime'],
+        e: rule['endTime'],
+        u: date.getTime(),
+        b: req.session.userid,
+        l: rule['timeLimit'] === undefined ? 0 : rule['timeLimit'],
+        c: rule['cost'] === undefined ? 0 : rule['cost'],
+        p: rule['per'] === undefined ? 0 : rule['per'],
+        up: 1,
+        dn: 0,
+        an: rule['angle']
+      };
+      rules.push(rule['updated']);
+      newRestrs.push(temp);
+    }
+    let objRules = {};
+    for (let i = 0; i < rules.length; i++) {
+      objRules[rules[i]] = [newRestrs[i]['i'], newRestrs[i]['t'], newRestrs[i]['s'], newRestrs[i]['e'], newRestrs[i]['d'], newRestrs[i]['an'], newRestrs[i]['u'], newRestrs[i]['up'], newRestrs[i]['dn'], newRestrs[i]['l'], newRestrs[i]['c'], newRestrs[i]['p']];
+    }
+    let update = mongooseModels.model.findOneAndUpdate(
+      {"points.point_id": req.body.point_id},
+      {"$push": {"points.$.restrs": { "$each": newRestrs } } },
+      {upsert: true, multi: true}
+    );
+    update.exec((err, result) => {
+      if (err) {
+        winston.log('warn', 'could not update restriction for point', {point: req.body.point_id, error: err});
+        res.status(200).json({success: false})
+      } else {
+        res.status(200).json({success: true, rules: objRules});
+      }
+    });
   });
 
   app.post('/imageUpload', passport.authMiddleware(redisclient), upload.single('image'), function (req, res, next) {
@@ -302,35 +361,38 @@ var findExists = function (needle, haystack) {
  }
  ]
  * @param results, JSON from mongo
+ * @param points, boolean whether to include points (sufficiently small radius)
  * @returns {Array}
  */
-var processResults = function(results, points) {
-  var returnResults = [];
-  for (var result in results) {
-    if (results[result].points.length === 0 && results[result].restrs.length === 0)
-      continue
-    var newResponse = {};
+let processResults = function(results, points) {
+  let returnResults = [];
+  for (let result in results) {
+    if (results[result].points.length === 0 && results[result].restrs.length === 0) {
+      continue;
+    }
+    let newResponse = {};
     newResponse["coordinates"] = results[result].loc.coordinates;
-    newResponse["restrs"] = results[result].restrs;
+    newResponse["restrs"] = [];
+    for (let lineRestr of results[result].restrs) {
+      newResponse["restrs"].push(lineRestr['i'], lineRestr['t'], lineRestr['s'], lineRestr['e'], lineRestr['d'], lineRestr['an'], lineRestr['u'], lineRestr['up'], lineRestr['dn'], lineRestr['l'], lineRestr['c'], lineRestr['p'])
+    }
+    winston.log('info', newResponse['restrs']);
     newResponse["multiPointProperties"] = {
       "points": [],
-      "restrs": []
+      "restrs": [],
+      "ids": []
     };
     newResponse["key"] = results[result].gid;
     if (points) {
-            // results is an array, [] here is related to index value not key/value
-      for (var point in results[result].points) {
-        if (results[result].points[point].point !== [] &&
-                    results[result].points[point].point !== null &&
-                    results[result].points[point].point !== undefined &&
-                    results[result].points[point].restrs !== undefined
-                ) {
-          newResponse.multiPointProperties.points.push(results[result].points[point].point);
-          var newRestr = [];
-          results[result].points[point].restrs.forEach(function (restr, idx) {
-            newRestr.push(restr['t'], restr['d'], restr['r'], restr['s'], restr['e'], restr['l'], restr['c'], restr['p']); // take out user id
+      for (let point of results[result].points) {
+        if (point.point !== null && point.point !== undefined && point.point.length === 2 && point.restrs !== undefined) {
+          newResponse.multiPointProperties.points.push(point.point);
+          let newRestr = [];
+          point.restrs.forEach( (restr, idx) => {
+            newRestr.push([restr['i'], restr['t'], restr['s'], restr['e'], restr['d'], restr['an'], restr['u'], restr['up'], restr['dn'], restr['l'], restr['c'], restr['p']]); // take out user id
           });
           newResponse.multiPointProperties.restrs.push(newRestr);
+          newResponse.multiPointProperties.ids.push(point.point_id.toString())
         }
       }
     }
