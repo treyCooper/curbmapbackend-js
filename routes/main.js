@@ -67,30 +67,30 @@ function api(app, redisclient) {
             let date = new Date();
             let restrs = [];
             for (let rule of req.body.restriction) {
-              let temp = {
-                i: uuidv1(),
-                t: rule['type'],
-                d: rule['days'],
-                s: rule['startTime'],
-                e: rule['endTime'],
-                u: date.getTime(),
-                b: req.session.userid,
-                l: rule['timeLimit'] === undefined ? 0 : rule['timeLimit'],
-                c: rule['cost'] === undefined ? 0 : rule['cost'],
-                p: rule['per'] === undefined ? 0 : rule['per'],
-                up: 1,
-                dn: 0,
-                an: rule['angle']
-              };
+              let temp = new mongooseModels.restrs();
+              temp.i = uuidv1();
+              temp.t = rule['type'];
+              temp.d = rule['days'];
+              temp.s = rule['startTime'];
+              temp.e = rule['endTime'];
+              temp.u = date.getTime();
+              temp.b = req.session.userid;
+              temp.l = rule['timeLimit'] === undefined ? 0 : rule['timeLimit'];
+              temp.c = rule['cost'] === undefined ? 0 : rule['cost'];
+              temp.p = rule['per'] === undefined ? 0 : rule['per'];
+              temp.up = 1;
+              temp.dn = 0;
+              temp.an = rule['angle'];
               restrs.push(temp);
             }
+            let newPoint = new mongooseModels.points();
+            newPoint.point = [req.body.point.lng, req.body.point.lat];
+            newPoint.restrs = restrs;
             var update = mongooseModels.model.findOneAndUpdate(
               {"_id": id},
               {
                 "$push": {
-                  "points": {
-                    "point": [req.body.point.lng, req.body.point.lat], "restrs": restrs
-                  }
+                  "points": newPoint
                 }
               },
               {upsert: true}
@@ -99,8 +99,7 @@ function api(app, redisclient) {
               if (err) throw new Error("could not update line");
               postgres.Point.findOne({where: {user_id: req.session.userid}}).then(function (userPoints) {
                 if (userPoints !== null) {
-                  var newPoints = userPoints.points_created;
-                  winston.log('info', typeof newPoints);
+                  let newPoints = userPoints.points_created;
                   postgres.addToPoints({
                     "point": [req.body.point.lng, req.body.point.lat],
                     "restrs": restrs
@@ -252,7 +251,7 @@ function api(app, redisclient) {
               results_to_send = processResults(result, true);
               res.status(200).json(results_to_send);
             } catch (e) {
-              winston.log(e)
+              winston.log('warn', 'error', e);
             }
           });
         } else if (distance < 3000) {
@@ -287,7 +286,7 @@ function api(app, redisclient) {
               const time_end = new Date().getTime();
               winston.log('warn', 'time elapsed in processing', {results_length: results_to_send.length, time: time_end-time_end_results})
             } catch (e) {
-              winston.log('info', e)
+              winston.log('info', 'error in query', e)
             }
           });
         }
