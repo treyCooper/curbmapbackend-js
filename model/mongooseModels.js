@@ -32,7 +32,14 @@ const RestrSchema = new mongoose.Schema({
 });
 
 const PointsSchema = new mongoose.Schema({
-  "point_id": mongoose.Schema.Types.ObjectId,
+  "point_id": {
+    type: mongoose.Schema.Types.ObjectId,
+    default: function () {
+      return new ObjectId()
+    },
+    required: true,
+    auto: true,
+  },
   "point": [Number, Number],
   "restrs": [RestrSchema]
 });
@@ -58,5 +65,11 @@ const MapLineSchema = new mongoose.Schema({
 }, {collection: 'MapLines'});
 
 const MapLines = mongoose.model('MapLines', MapLineSchema);
+const Points = mongoose.model('Points', PointsSchema);
+const Restrs = mongoose.model('Restrs', RestrSchema);
 
-module.exports.model = MapLines;
+module.exports = {
+  model : MapLines,
+  points: Points,
+  restrs: Restrs
+}
