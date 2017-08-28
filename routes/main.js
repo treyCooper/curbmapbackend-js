@@ -249,7 +249,8 @@ function api(app, redisclient) {
                               // winston.log('info', util.inspect(result, {depth: null}));
               let results_to_send;
               results_to_send = processResults(result, true);
-              res.status(200).json(results_to_send);
+              res.status(200).write(results_to_send);
+              res.flush()
             } catch (e) {
               winston.log('warn', 'error', e);
             }
@@ -282,7 +283,8 @@ function api(app, redisclient) {
               } else {
                 results_to_send = processResults(result, false);
               }
-              res.status(200).json(results_to_send);
+              res.status(200).write(results_to_send);
+              res.flush()
               const time_end = new Date().getTime();
               winston.log('warn', 'time elapsed in processing', {results_length: results_to_send.length, time: time_end-time_end_results})
             } catch (e) {
