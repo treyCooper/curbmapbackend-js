@@ -46,9 +46,9 @@ var corsOptions = {
 
 app.options('*', cors(corsOptions)); // include before other routes
 app.use(cors(corsOptions));
+app.use(compression());
 app.use(logger('dev'));
 app.use(cookieParser());
-app.use(compression({filter: shouldCompress}));
 // routes can also get the body
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
