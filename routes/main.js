@@ -375,7 +375,6 @@ let processResults = function(results, points) {
     for (let lineRestr of results[result].restrs) {
       newResponse["restrs"].push(lineRestr['i'], lineRestr['t'], lineRestr['s'], lineRestr['e'], lineRestr['d'], lineRestr['an'], lineRestr['u'], lineRestr['up'], lineRestr['dn'], lineRestr['l'], lineRestr['c'], lineRestr['p'])
     }
-    winston.log('info', newResponse['restrs']);
     newResponse["multiPointProperties"] = {
       "points": [],
       "restrs": [],
