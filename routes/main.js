@@ -312,7 +312,7 @@ function api(app, redisclient) {
               });
               // winston.log('info', util.inspect(result, {depth: null}));
               let results_to_send;
-              if (req.query.code.length >= 10) {
+              if (req.query.code.length >= 11) {
                 results_to_send = processResults(result, true);
               } else {
                 results_to_send = processResults(result, false);
