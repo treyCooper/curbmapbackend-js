@@ -38,6 +38,7 @@
     "sequelize": "^3.30.4",
     "serve-favicon": "^2.4.3",
     "supertest": "^3.0.0",
+    "twilio": "^3.9.2",
     "winston": "^2.3.1"
   }
 }
