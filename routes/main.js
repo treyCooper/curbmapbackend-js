@@ -5,6 +5,7 @@ const mongooseModels = require("../model/mongooseModels.js");
 const postgres = require("../model/postgresModels");
 const OpenLocationCode = require("open-location-code").OpenLocationCode;
 const openLocationCode = new OpenLocationCode();
+const fs = require('fs');
 const uuidv1 = require("uuid/v1");
 const levels = {
   user: ["ROLE_USER", "ROLE_ADMIN", "ROLE_OWNER"],
@@ -13,10 +14,15 @@ const levels = {
 };
 const maxSize = 2 * 1000 * 1000;
 const multer = require("multer");
-const upload = multer({ limits: { fileSize: maxSize } });
+const upload = multer({
+  limits: {
+    fileSize: maxSize
+  }
+});
 const Jimp = require("jimp");
 const passport = require("passport");
 const winston = require("winston");
+const MessagingResponse = require('twilio').twiml.MessagingResponse;
 
 /**
  * This is a messy endpoint but it checks a lot of things
@@ -27,14 +33,12 @@ const winston = require("winston");
  * Fourth: We add the point to the user's list of points_created in the points table
  */
 function api(app, redisclient) {
-  app.post("/addPoint", passport.authMiddleware(redisclient), function(req, res, next) {
-    winston.log("warn", "addPoint", typeof req.body.point.lat);
-    {
+  app.post("/addPoint", passport.authMiddleware(redisclient), function (req, res, next) {
+    winston.log("warn", "addPoint", typeof req.body.point.lat); {
       if (req.body.point.lat !== undefined && req.body.point.lng !== undefined && req.body.restriction.length >= 1) {
         try {
           // Query for line within 20 meters
-          var query = mongooseModels.model.aggregate([
-            {
+          var query = mongooseModels.model.aggregate([{
               $geoNear: {
                 near: {
                   type: "Point",
@@ -45,24 +49,33 @@ function api(app, redisclient) {
                 maxDistance: 20
               }
             },
-            { $limit: 1 }
+            {
+              $limit: 1
+            }
           ]);
-          query.exec(function(err, result) {
+          query.exec(function (err, result) {
             // If no result!
             if (result[0] === undefined) {
-              res.json({ success: false });
+              res.json({
+                success: false
+              });
               return;
             }
             // Or if an error in the result
             if (err) {
-              res.json({ success: false });
+              res.json({
+                success: false
+              });
               return;
             }
             let id = result[0]["_id"];
             // don't duplicate points
             for (let pointTemp of result[0].points) {
               if (pointTemp.point[0] === req.body.point.lng && pointTemp.point[1] === req.body.point.lat) {
-                res.json({ success: false, reason: "point exists" });
+                res.json({
+                  success: false,
+                  reason: "point exists"
+                });
                 return;
               }
             }
@@ -88,22 +101,25 @@ function api(app, redisclient) {
             let newPoint = new mongooseModels.points();
             newPoint.point = [req.body.point.lng, req.body.point.lat];
             newPoint.restrs = restrs;
-            var update = mongooseModels.model.findOneAndUpdate(
-              { _id: id },
-              {
-                $push: {
-                  points: newPoint
-                }
-              },
-              { upsert: true }
-            );
-            update.exec(function(err, resultupdated) {
+            var update = mongooseModels.model.findOneAndUpdate({
+              _id: id
+            }, {
+              $push: {
+                points: newPoint
+              }
+            }, {
+              upsert: true
+            });
+            update.exec(function (err, resultupdated) {
               if (err) throw new Error("could not update line");
-              postgres.Point.findOne({ where: { user_id: req.session.userid } }).then(function(userPoints) {
+              postgres.Point.findOne({
+                where: {
+                  user_id: req.session.userid
+                }
+              }).then(function (userPoints) {
                 if (userPoints !== null) {
                   let newPoints = userPoints.points_created;
-                  postgres.addToPoints(
-                    {
+                  postgres.addToPoints({
                       point: [req.body.point.lng, req.body.point.lat],
                       restrs: restrs
                     },
@@ -114,11 +130,16 @@ function api(app, redisclient) {
                   postgres.Point
                     .build({
                       user_id: req.session.userid,
-                      points_created: [{ point: [req.body.point.lng, req.body.point.lat], restrs: restrs }]
+                      points_created: [{
+                        point: [req.body.point.lng, req.body.point.lat],
+                        restrs: restrs
+                      }]
                     })
                     .save()
-                    .then(function() {
-                      res.json({ success: true });
+                    .then(function () {
+                      res.json({
+                        success: true
+                      });
                     });
                 }
               });
@@ -126,24 +147,29 @@ function api(app, redisclient) {
           });
         } catch (error) {
           winston.log("info", "Error" + error);
-          res.json({ success: false });
+          res.json({
+            success: false
+          });
         }
       }
     }
   });
-  app.post("/upVote", passport.authMiddleware(redisclient), function(req, res, next) {
+  app.post("/upVote", passport.authMiddleware(redisclient), function (req, res, next) {
     if (req.session.passport.user === "curbmaptest") {
       return next();
     }
 
     // TODO: MUST WRITE up Voting of restriction
   });
-  app.post("/downVote", passport.authMiddleware(redisclient), function(req, res, next) {
-    winston.log("info", "downVote", { body: req.body, headers: req.header });
+  app.post("/downVote", passport.authMiddleware(redisclient), function (req, res, next) {
+    winston.log("info", "downVote", {
+      body: req.body,
+      headers: req.header
+    });
     // TODO: MUST WRITE Down Voting of restriction
   });
 
-  app.post("/addPointRestr", passport.authMiddleware(redisclient), function(req, res, next) {
+  app.post("/addPointRestr", passport.authMiddleware(redisclient), function (req, res, next) {
     winston.log("info", req.body);
     let rules = [];
     let newRestrs = [];
@@ -184,25 +210,55 @@ function api(app, redisclient) {
         newRestrs[i]["p"]
       ];
     }
-    let update = mongooseModels.model.findOneAndUpdate(
-      { "points.point_id": req.body.point_id },
-      { $push: { "points.$.restrs": { $each: newRestrs } } },
-      { upsert: true, multi: true }
-    );
+    let update = mongooseModels.model.findOneAndUpdate({
+      "points.point_id": req.body.point_id
+    }, {
+      $push: {
+        "points.$.restrs": {
+          $each: newRestrs
+        }
+      }
+    }, {
+      upsert: true,
+      multi: true
+    });
     update.exec((err, result) => {
       if (err) {
-        winston.log("warn", "could not update restriction for point", { point: req.body.point_id, error: err });
-        res.status(200).json({ success: false });
+        winston.log("warn", "could not update restriction for point", {
+          point: req.body.point_id,
+          error: err
+        });
+        res.status(200).json({
+          success: false
+        });
       } else {
-        res.status(200).json({ success: true, rules: objRules });
+        res.status(200).json({
+          success: true,
+          rules: objRules
+        });
       }
     });
   });
 
-  app.post("/imageUpload", passport.authMiddleware(redisclient), upload.single("image"), function(req, res, next) {
+  app.post("/getdatafromtext", function (req, res, next) {
+    var twilmsg = new MessagingResponse();
+    twilmsg.message('success! Thanks for making curbmap better!');
+    const tempJSON = {
+      from: req.body.From,
+      body: req.body.Body,
+      time: new Date(),
+    };
+    fs.appendFileSync('textmessages.json', JSON.stringify(tempJSON));
+    res.writeHead(200, {
+      'Content-Type': 'text/xml'
+    });
+    res.end(twilmsg.toString());
+  });
+
+  app.post("/imageUpload", passport.authMiddleware(redisclient), upload.single("image"), function (req, res, next) {
     if (findExists(req.session.role, levels.user)) {
       try {
-        Jimp.read(req.file.buffer, function(err, image) {
+        Jimp.read(req.file.buffer, function (err, image) {
           if (err) {
             res.status(500).json({});
           } else {
@@ -232,7 +288,7 @@ function api(app, redisclient) {
       res.status(401);
     }
   });
-  app.get("/areaOLC", passport.authMiddleware(redisclient), function(req, res, next) {
+  app.get("/areaOLC", passport.authMiddleware(redisclient), function (req, res, next) {
     const time_start = new Date().getTime();
     if (
       findExists(req.session.role, levels.user) &&
@@ -274,7 +330,7 @@ function api(app, redisclient) {
               }
             }
           });
-          query.exec(function(err, result) {
+          query.exec(function (err, result) {
             try {
               // winston.log('info', util.inspect(result, {depth: null}));
               let results_to_send;
@@ -303,7 +359,7 @@ function api(app, redisclient) {
               }
             }
           });
-          query.exec(function(err, result) {
+          query.exec(function (err, result) {
             try {
               const time_end_results = new Date().getTime();
               winston.log("warn", "time elapsed in mongo", {
@@ -337,7 +393,7 @@ function api(app, redisclient) {
     }
   });
 
-  app.get("/areaPolygon", passport.authMiddleware(redisclient), function(req, res, next) {
+  app.get("/areaPolygon", passport.authMiddleware(redisclient), function (req, res, next) {
     const time_start = new Date().getTime();
     if (
       findExists(req.session.role, levels.user) &&
@@ -354,11 +410,16 @@ function api(app, redisclient) {
         const user = req.query.user;
         const lower = [lng1, lat1];
         const upper = [lng2, lat2];
-        const distance = geolib.getDistance(
-          { longitude: lower[0], latitude: upper[1] },
-          { longitude: upper[0], latitude: upper[1] }
-        ); // keep the distance to one dimension
-        winston.log("info", "DISTANCE:", { distance: distance });
+        const distance = geolib.getDistance({
+          longitude: lower[0],
+          latitude: upper[1]
+        }, {
+          longitude: upper[0],
+          latitude: upper[1]
+        }); // keep the distance to one dimension
+        winston.log("info", "DISTANCE:", {
+          distance: distance
+        });
         // diagonal distance in the view
         if (user !== undefined && user === req.session.passport.user) {
           var query = mongooseModels.model.find({
@@ -384,7 +445,7 @@ function api(app, redisclient) {
               }
             }
           });
-          query.exec(function(err, result) {
+          query.exec(function (err, result) {
             try {
               // winston.log('info', util.inspect(result, {depth: null}));
               let results_to_send;
@@ -413,7 +474,7 @@ function api(app, redisclient) {
               }
             }
           });
-          query.exec(function(err, result) {
+          query.exec(function (err, result) {
             try {
               const time_end_results = new Date().getTime();
               winston.log("warn", "time elapsed in mongo", {
@@ -447,7 +508,7 @@ function api(app, redisclient) {
     }
   });
 
-  app.get("/areaCircle", passport.authMiddleware(redisclient), function(req, res, next) {
+  app.get("/areaCircle", passport.authMiddleware(redisclient), function (req, res, next) {
     if (req.user.aud[0] === "curbmap-resource" && findExists(req.user.authorities, levels.user)) {
       var center = [req.query.lng, req.query.lat];
       var rad = req.query.rad;
@@ -455,10 +516,12 @@ function api(app, redisclient) {
       if (rad < 50) {
         var query = mongooseModels.model.find({
           loc: {
-            $geoWithin: { $center: [center, rad] }
+            $geoWithin: {
+              $center: [center, rad]
+            }
           }
         });
-        query.exec(function(err, result) {
+        query.exec(function (err, result) {
           try {
             var results_to_send = processResults(result);
             res.json(results_to_send);
@@ -475,7 +538,7 @@ function api(app, redisclient) {
   });
 }
 
-var findExists = function(needle, haystack) {
+var findExists = function (needle, haystack) {
   return haystack.indexOf(needle) >= 0;
 };
 
@@ -508,7 +571,7 @@ var findExists = function(needle, haystack) {
  * @param points, boolean whether to include points (sufficiently small radius)
  * @returns {Array}
  */
-let processResults = function(results, points) {
+let processResults = function (results, points) {
   let returnResults = [];
   for (let result in results) {
     if (results[result].points.length === 0 && results[result].restrs.length === 0) {
