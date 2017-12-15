@@ -1,4 +1,4 @@
-"use strict";
+/* "use strict"; */
 const geolib = require("geolib");
 const atob = require("atob");
 const mongooseModels = require("../model/mongooseModels.js");
@@ -33,146 +33,114 @@ const MessagingResponse = require("twilio").twiml.MessagingResponse;
  * Fourth: We add the point to the user's list of points_created in the points table
  */
 function api(app, redisclient) {
-    app.post("/addLine", passport.authMiddleware(redisclient), function(req, res, next) {
-        winston.log("info", "XXXX");
+    app.post("/addLine", passport.authMiddleware(redisclient), async function(req, res, next) {
         if (
-            req.body.line === undefined ||
-            req.body.restriction === undefined ||
-            typeof req.body.line != "object" ||
-            req.body.line.length <= 1
+            typeof req.body.line !== "object" ||
+            req.body.line.length < 2 || // start end points must exist for line to exist
+            typeof req.body.restrictions !== "object" ||
+            req.body.restrictions.length == 0
         ) {
             res.status(400).json({ success: false });
         } else {
-            res.status(200).json({ success: true });
-        }
-    });
-
-    app.post("/addPoint", passport.authMiddleware(redisclient), function(req, res, next) {
-        if (req.body.point.lat !== undefined && req.body.point.lng !== undefined && req.body.restriction.length >= 1) {
+            winston.log("error", "HERE!!!XXX");
             try {
-                // Query for line within 20 meters
-                var query = mongooseModels.model.aggregate([
-                    {
-                        $geoNear: {
-                            near: {
-                                type: "Point",
-                                coordinates: [req.body.point.lng, req.body.point.lat]
-                            },
-                            distanceField: "distance",
-                            spherical: true,
-                            maxDistance: 20
-                        }
-                    },
-                    {
-                        $limit: 1
-                    }
-                ]);
-                query.exec(function(err, result) {
-                    // If no result!
-                    if (result[0] === undefined) {
-                        res.json({
-                            success: false
-                        });
-                        return;
-                    }
-                    // Or if an error in the result
-                    if (err) {
-                        res.json({
-                            success: false
-                        });
-                        return;
-                    }
-                    let id = result[0]["_id"];
-                    // don't duplicate points
-                    for (let pointTemp of result[0].points) {
-                        if (pointTemp.point[0] === req.body.point.lng && pointTemp.point[1] === req.body.point.lat) {
-                            res.json({
-                                success: false,
-                                reason: "point exists"
-                            });
-                            return;
-                        }
-                    }
-                    let date = new Date();
-                    let restrs = [];
-                    for (let rule of req.body.restriction) {
-                        let temp = new mongooseModels.restrs();
-                        temp.i = uuidv1();
-                        temp.t = rule["type"];
-                        temp.d = rule["days"];
-                        temp.s = rule["startTime"];
-                        temp.e = rule["endTime"];
-                        temp.u = date.getTime();
-                        temp.b = req.session.userid;
-                        temp.l = rule["timeLimit"] === undefined ? 0 : rule["timeLimit"];
-                        temp.c = rule["cost"] === undefined ? 0 : rule["cost"];
-                        temp.p = rule["per"] === undefined ? 0 : rule["per"];
-                        temp.up = 1;
-                        temp.dn = 0;
-                        temp.an = rule["angle"];
-                        restrs.push(temp);
-                    }
-                    let newPoint = new mongooseModels.points();
-                    newPoint.point = [req.body.point.lng, req.body.point.lat];
-                    newPoint.restrs = restrs;
-                    var update = mongooseModels.model.findOneAndUpdate(
-                        {
-                            _id: id
-                        },
-                        {
-                            $push: {
-                                points: newPoint
-                            }
-                        },
-                        {
-                            upsert: true
-                        }
-                    );
-                    update.exec(function(err, resultupdated) {
-                        if (err) throw new Error("could not update line");
-                        postgres.Point.findOne({
-                            where: {
-                                user_id: req.session.userid
-                            }
-                        }).then(function(userPoints) {
-                            if (userPoints !== null) {
-                                let newPoints = userPoints.points_created;
-                                postgres.addToPoints(
-                                    {
-                                        point: [req.body.point.lng, req.body.point.lat],
-                                        restrs: restrs
-                                    },
-                                    req.session.userid,
-                                    res
-                                );
-                            } else {
-                                postgres.Point.build({
-                                    user_id: req.session.userid,
-                                    points_created: [
-                                        {
-                                            point: [req.body.point.lng, req.body.point.lat],
-                                            restrs: restrs
-                                        }
-                                    ]
-                                })
-                                    .save()
-                                    .then(function() {
-                                        res.json({
-                                            success: true
-                                        });
-                                    });
-                            }
-                        });
+                if (req.body.parentid === undefined || !mongooseModels.obj_id.isValid(req.body.parentid)) {
+                    // this type does not get added to a parent line, so it is parentless and gets added to the
+                    // Lines collection which hasn't had
+                    let new_line = new mongooseModels.linesWithoutParents({
+                        loc: { type: "LineString", coordinates: req.body.line },
+                        restrs: [],
+                        restrs_length: 0
                     });
-                });
+                    console.log(new_line);
+                    for (restr of req.body.restrictions) {
+                        if (checkRestr(restr)) {
+                            restr_checked = {
+                                tp: restr.type,
+                                an: restr.angle,
+                                st: restr.start,
+                                ed: restr.end,
+                                ds: restr.days,
+                                wk: restr.weeks,
+                                mn: restr.months,
+                                lt: restr.limit,
+                                pm: restr.permit,
+                                ct: restr.cost,
+                                pr: restr.per,
+                                mo: restr.motorcycle,
+                                up: 0,
+                                dn: 0,
+                                by: req.session.userid,
+                                ud: new Date()
+                            };
+                            new_line.restrs.push(restr_checked);
+                            new_line.restrs_length++;
+                        }
+                    }
+                    if (new_line.restrs.length > 0) {
+                        winston.log("error", new_line.restrs.length);
+                        new_line.save();
+                        res.status(200).json({ success: true });
+                    } else {
+                        res.status(200).json({ success: false });
+                    }
+                } else {
+                    let parent_id = mongooseModels.obj_id(req.body.parentid);
+                    winston.log("error", parent_id);
+                    let parents = await mongooseModels.parents
+                        .find({
+                            _id: parent_id
+                        })
+                        .exec();
+                    winston.log("error", parents);
+                    if (parents.length > 0) {
+                        winston.log("info", "length", parents.length);
+                        let parent = parents[0];
+                        parent.lines.push({ loc: { type: "LineString", coordinates: req.body.line } });
+                        let new_length = parent.lines.length;
+                        winston.log("error", new_length);
+                        let checked_restrs = [];
+                        for (restr of req.body.restrictions) {
+                            winston.log("error", "XXX restr each:", restr);
+                            if (checkRestr(restr)) {
+                                winston.log("error", "XXX restr", restr);
+                                restr_checked = {
+                                    tp: restr.type,
+                                    an: restr.angle,
+                                    st: restr.start,
+                                    ed: restr.end,
+                                    ds: restr.days,
+                                    wk: restr.weeks,
+                                    mn: restr.months,
+                                    lt: restr.limit,
+                                    pm: restr.permit,
+                                    ct: restr.cost,
+                                    pr: restr.per,
+                                    mo: restr.motorcycle,
+                                    up: 0,
+                                    dn: 0,
+                                    by: req.session.userid,
+                                    ud: new Date()
+                                };
+                                parent.lines[new_length - 1].restrs.push(restr_checked);
+                            }
+                        }
+                        // Went through all new restrictions... now test if any were correct and added
+                        if (parent.lines[new_length - 1].restrs.length > 0) {
+                            // If the new line has some restrictions, add it, otherwise, don't
+                            await parent.save();
+                            res.status(200).json({ success: true });
+                        } else {
+                            res.status(200).json({ success: false });
+                        }
+                    }
+                }
             } catch (error) {
-                winston.log("info", "Error" + error);
-                res.json({
-                    success: false
-                });
+                winston.log("warn", error);
             }
         }
     });
+
     app.post("/upVote", passport.authMiddleware(redisclient), function(req, res, next) {
         if (req.session.passport.user === "curbmaptest") {
             return next();
@@ -188,79 +156,55 @@ function api(app, redisclient) {
         // TODO: MUST WRITE Down Voting of restriction
     });
 
-    app.post("/addPointRestr", passport.authMiddleware(redisclient), function(req, res, next) {
+    app.post("/addLineRestr", passport.authMiddleware(redisclient), async function(req, res, next) {
         winston.log("info", req.body);
-        let rules = [];
-        let newRestrs = [];
-        let date = new Date();
-        for (let rule of req.body.restrs) {
-            let temp = {
-                i: uuidv1(),
-                t: rule["type"],
-                d: rule["days"],
-                s: rule["startTime"],
-                e: rule["endTime"],
-                u: date.getTime(),
-                b: req.session.userid,
-                l: rule["timeLimit"] === undefined ? 0 : rule["timeLimit"],
-                c: rule["cost"] === undefined ? 0 : rule["cost"],
-                p: rule["per"] === undefined ? 0 : rule["per"],
-                up: 1,
-                dn: 0,
-                an: rule["angle"]
-            };
-            rules.push(rule["updated"]);
-            newRestrs.push(temp);
-        }
-        let objRules = {};
-        for (let i = 0; i < rules.length; i++) {
-            objRules[rules[i]] = [
-                newRestrs[i]["i"],
-                newRestrs[i]["t"],
-                newRestrs[i]["s"],
-                newRestrs[i]["e"],
-                newRestrs[i]["d"],
-                newRestrs[i]["an"],
-                newRestrs[i]["u"],
-                newRestrs[i]["up"],
-                newRestrs[i]["dn"],
-                newRestrs[i]["l"],
-                newRestrs[i]["c"],
-                newRestrs[i]["p"]
-            ];
-        }
-        let update = mongooseModels.model.findOneAndUpdate(
-            {
-                "points.point_id": req.body.point_id
-            },
-            {
-                $push: {
-                    "points.$.restrs": {
-                        $each: newRestrs
+        try {
+            temp_subdocs = {};
+            let line_sub_docs = await mongooseModels.parents
+                .aggregate([
+                    {
+                        $match: {
+                            _id: req.body.parentid
+                        }
+                    },
+                    {
+                        limit: 1
+                    }
+                ])
+                .exec();
+            if (docs.length >= 1) {
+                // we found the line
+                the_line_parent = docs[0];
+                let location = -1;
+                for (let i = 0; i < length; i++) {
+                    if (line._id === req.body.lineid) {
+                        location = i;
+                        break;
                     }
                 }
-            },
-            {
-                upsert: true,
-                multi: true
+                for (restr in req.body.restrictions) {
+                    let temp_r = {
+                        tp: restr["type"],
+                        an: restr["angle"] ? restr["angle"] : 0,
+                        st: restr["start"],
+                        ed: restr["end"],
+                        ds: restr["days"],
+                        wk: restr["weeks"],
+                        mn: restr["mn"],
+                        lt: restr["limit"] ? restr["limit"] : null,
+                        pm: restr["permit"] ? restr["permit"] : null,
+                        ct: restr["cost"] ? restr["cost"] : null,
+                        pr: restr["per"] ? restr["per"] : null,
+                        mo: restr["motorcycle"] ? true : false,
+                        up: 0,
+                        dn: 0,
+                        by: req.session.userid
+                    };
+                    the_line_parent.lines[location].create(temp_r);
+                }
+                the_line_parent.save();
             }
-        );
-        update.exec((err, result) => {
-            if (err) {
-                winston.log("warn", "could not update restriction for point", {
-                    point: req.body.point_id,
-                    error: err
-                });
-                res.status(200).json({
-                    success: false
-                });
-            } else {
-                res.status(200).json({
-                    success: true,
-                    rules: objRules
-                });
-            }
-        });
+        } catch (error) {}
     });
 
     app.post("/getdatafromtext", function(req, res, next) {
@@ -566,6 +510,69 @@ function api(app, redisclient) {
 
 var findExists = function(needle, haystack) {
     return haystack.indexOf(needle) >= 0;
+};
+
+var checkRestr = function(restr) {
+    return (
+        restr.type !== undefined &&
+        checkDurationForType(restr.type, restr.duration) &&
+        checkPermitForType(restr.type, restr.permit) &&
+        checkCostForType(restr.type, restr.cost, restr.per) &&
+        restr.side !== undefined &&
+        restr.angle !== undefined &&
+        typeof restr.days === "object" &&
+        restr.days.length === 7 &&
+        typeof restr.weeks === "object" &&
+        restr.weeks.length === 4 &&
+        typeof restr.months === "object" &&
+        restr.months.length === 12 &&
+        restr.start !== undefined &&
+        restr.start >= 0 &&
+        restr.start <= 1440 &&
+        restr.end >= 0 &&
+        restr.end <= 1440
+    );
+};
+
+var checkDurationForType = function(type, duration) {
+    if (type == 0 || type == 1) {
+        // Short term parking < 1hour (green or metered green)
+        return duration !== undefined && duration < 60;
+    } else if (type == 2 || type == 3) {
+        // Timed parking >= 1hour (metered or time limited)
+        return duration !== undefined && duration >= 60;
+    } else if (type == 4) {
+        // Time limit with permit... duration must be defined and a valid value
+        return duration !== undeinfed && duration > 0 && duration <= 1440;
+    } else if (duration !== undefined) {
+        // Some other type that has a defined duration allowed but must be valid
+        // I've never seen more than 10 hour parking, but if there is like
+        return duration > 0 && duration < 1440;
+    }
+    // Otherwise an undefined or null duration is fine
+    return true;
+};
+var checkPermitForType = function(type, permit) {
+    if (type == 4 || type == 6) {
+        return (
+            permit !== undefined &&
+            !isNull(permit) &&
+            permit !== "Disabled" &&
+            permit !== "Taxi" &&
+            permit !== "Commercial" &&
+            permit !== "Other"
+        );
+    } else if (type == 10) {
+        return permit !== undefined && permit === "Disabled";
+    }
+    return true;
+};
+
+var checkCostForType = function(type, cost, per) {
+    if (type == 1 || type == 3) {
+        return cost !== undefined && per !== undefined && cost > 0 && per > 0;
+    }
+    return true;
 };
 
 /**
