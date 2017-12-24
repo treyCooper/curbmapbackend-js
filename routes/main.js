@@ -16,12 +16,23 @@ const levels = {
     ],
     owner: ["ROLE_OWNER"]
 };
-const maxSize = 2 * 1000 * 1000;
+const maxSize = 3 * 1000 * 1000;
 const multer = require("multer");
+
+var storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/')
+    },
+    filename: function (req, file, cb) {
+        cb(null, req.session.userid + '-' + Date.now())
+    }
+})
+
 const upload = multer({
     limits: {
         fileSize: maxSize
-    }
+    },
+    storage: storage
 });
 const Jimp = require("jimp");
 const passport = require("passport");
@@ -259,21 +270,12 @@ function api(app, redisclient) {
                 try {
                     temp_subdocs = {};
                     let parent_id = mongooseModels.obj_id(req.body.parentid);
-                    let line_sub_docs = await mongooseModels
+                    let the_line_parent = await mongooseModels
                         .parents
-                        .aggregate([
-                            {
-                                $match: {
-                                    _id: parent_id
-                                }
-                            }, {
-                                limit: 1
-                            }
-                        ])
+                        .findOne({_id: parent_id})
                         .exec();
-                    if (docs.length >= 1) {
+                    if (the_line_parent !== null) {
                         // we found the parent line, now find the sub-line segment
-                        the_line_parent = docs[0];
                         let location = -1;
                         for (let i = 0; i < length; i++) {
                             if (line._id === line_id) {
@@ -364,12 +366,21 @@ function api(app, redisclient) {
     app.post("/imageUpload", passport.authMiddleware(redisclient), upload.single("image"), async function (req, res, next) {
         if (findExists(req.session.role, levels.user)) {
             try {
-                res.status(200);
+                fs.renameSync(req.file.path, req.file.path + req.body.olc + ".jpg");
+                res
+                    .status(200)
+                    .json({success: true});
             } catch (e) {
-                res.status(500);
+                fs.unlinkSync(req.file.path);
+                res
+                    .status(500)
+                    .json({success: false});
             }
         } else {
-            res.status(401);
+            fs.unlinkSync(req.file.path);
+            res
+                .status(401)
+                .json({success: false});
         }
     });
     app.get("/areaOLC", passport.authMiddleware(redisclient), async function (req, res, next) {
