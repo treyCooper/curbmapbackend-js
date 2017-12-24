@@ -16,7 +16,7 @@ const levels = {
     ],
     owner: ["ROLE_OWNER"]
 };
-const maxSize = 3 * 1000 * 1000;
+const maxSize = 6 * 1000 * 1000;
 const multer = require("multer");
 
 var storage = multer.diskStorage({
