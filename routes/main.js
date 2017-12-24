@@ -43,10 +43,12 @@ function api(app, redisclient) {
     app
         .post("/addLine", passport.authMiddleware(redisclient), async function (req, res, next) {
             if (typeof req.body.line !== "object" || req.body.line.length < 2 || // start & end points must exist for line to exist
-            typeof req.body.restrictions !== "object" || req.body.restrictions.length == 0) {
+                typeof req.body.restrictions !== "object" || req.body.restrictions.length == 0) {
                 res
                     .status(400)
-                    .json({success: false});
+                    .json({
+                        success: false
+                    });
             } else {
                 try {
                     if (req.body.parentid === undefined || !mongooseModels.obj_id.isValid(req.body.parentid)) {
@@ -99,14 +101,18 @@ function api(app, redisclient) {
                         } else {
                             res
                                 .status(200)
-                                .json({success: false});
+                                .json({
+                                    success: false
+                                });
                         }
                     } else {
                         let parent_id = mongooseModels.obj_id(req.body.parentid);
 
                         let parent = await mongooseModels
                             .parents
-                            .findOne({"_id": parent_id})
+                            .findOne({
+                                "_id": parent_id
+                            })
                             .exec();
                         if (parent !== null) {
                             parent
@@ -172,7 +178,9 @@ function api(app, redisclient) {
                                 // parent line
                                 res
                                     .status(200)
-                                    .json({success: false});
+                                    .json({
+                                        success: false
+                                    });
                             }
                         }
                     }
@@ -207,13 +215,11 @@ function api(app, redisclient) {
                 try {
                     let lines_without_parent = await mongooseModels
                         .linesWithoutParents
-                        .aggregate([
-                            {
-                                $match: {
-                                    _id: line_id
-                                }
+                        .aggregate([{
+                            $match: {
+                                _id: line_id
                             }
-                        ])
+                        }])
                         .exec();
                     if (lines_without_parent >= 1) {
                         let line = lines_without_parent[0];
@@ -222,29 +228,23 @@ function api(app, redisclient) {
                             if (checkRestr(restr)) {
                                 let temp_r = {
                                     tp: restr["type"],
-                                    an: restr["angle"]
-                                        ? restr["angle"]
-                                        : 0,
+                                    an: restr["angle"] ?
+                                        restr["angle"] : 0,
                                     st: restr["start"],
                                     ed: restr["end"],
                                     ds: restr["days"],
                                     wk: restr["weeks"],
                                     mn: restr["months"],
-                                    lt: restr["limit"]
-                                        ? restr["limit"]
-                                        : null,
-                                    pm: restr["permit"]
-                                        ? restr["permit"]
-                                        : null,
-                                    ct: restr["cost"]
-                                        ? restr["cost"]
-                                        : null,
-                                    pr: restr["per"]
-                                        ? restr["per"]
-                                        : null,
-                                    ve: restr["vehicle"]
-                                        ? true
-                                        : false,
+                                    lt: restr["limit"] ?
+                                        restr["limit"] : null,
+                                    pm: restr["permit"] ?
+                                        restr["permit"] : null,
+                                    ct: restr["cost"] ?
+                                        restr["cost"] : null,
+                                    pr: restr["per"] ?
+                                        restr["per"] : null,
+                                    ve: restr["vehicle"] ?
+                                        true : false,
                                     up: 0,
                                     dn: 0,
                                     by: req.session.userid
@@ -257,13 +257,17 @@ function api(app, redisclient) {
                         await line.save();
                         res
                             .status(200)
-                            .json({success: true});
+                            .json({
+                                success: true
+                            });
                     }
                 } catch (err) {
                     // couldn't find parent or something went wrong with search
                     res
                         .status(400)
-                        .json({success: false});
+                        .json({
+                            success: false
+                        });
                 }
             } else {
                 // Add a restriction to a line with a parent
@@ -272,7 +276,9 @@ function api(app, redisclient) {
                     let parent_id = mongooseModels.obj_id(req.body.parentid);
                     let the_line_parent = await mongooseModels
                         .parents
-                        .findOne({_id: parent_id})
+                        .findOne({
+                            _id: parent_id
+                        })
                         .exec();
                     if (the_line_parent !== null) {
                         // we found the parent line, now find the sub-line segment
@@ -287,29 +293,23 @@ function api(app, redisclient) {
                             if (checkRestr(restr)) {
                                 let temp_r = {
                                     tp: restr["type"],
-                                    an: restr["angle"]
-                                        ? restr["angle"]
-                                        : 0,
+                                    an: restr["angle"] ?
+                                        restr["angle"] : 0,
                                     st: restr["start"],
                                     ed: restr["end"],
                                     ds: restr["days"],
                                     wk: restr["weeks"],
                                     mn: restr["months"],
-                                    lt: restr["limit"]
-                                        ? restr["limit"]
-                                        : null,
-                                    pm: restr["permit"]
-                                        ? restr["permit"]
-                                        : null,
-                                    ct: restr["cost"]
-                                        ? restr["cost"]
-                                        : null,
-                                    pr: restr["per"]
-                                        ? restr["per"]
-                                        : null,
-                                    ve: restr["vehicle"]
-                                        ? true
-                                        : false,
+                                    lt: restr["limit"] ?
+                                        restr["limit"] : null,
+                                    pm: restr["permit"] ?
+                                        restr["permit"] : null,
+                                    ct: restr["cost"] ?
+                                        restr["cost"] : null,
+                                    pr: restr["per"] ?
+                                        restr["per"] : null,
+                                    ve: restr["vehicle"] ?
+                                        true : false,
                                     up: 0,
                                     dn: 0,
                                     by: req.session.userid
@@ -338,7 +338,9 @@ function api(app, redisclient) {
                     // Something happened in the query
                     res
                         .status(400)
-                        .json({success: false});
+                        .json({
+                            success: false
+                        });
                 }
             }
         } else {
@@ -346,7 +348,9 @@ function api(app, redisclient) {
             // don't know what line to add to
             res
                 .status(400)
-                .json({success: false});
+                .json({
+                    success: false
+                });
         }
     });
 
@@ -359,28 +363,36 @@ function api(app, redisclient) {
             time: new Date()
         };
         fs.appendFileSync("textmessages.json", JSON.stringify(tempJSON));
-        res.writeHead(200, {"Content-Type": "text/xml"});
+        res.writeHead(200, {
+            "Content-Type": "text/xml"
+        });
         res.end(twilmsg.toString());
     });
 
     app.post("/imageUpload", passport.authMiddleware(redisclient), upload.single("image"), async function (req, res, next) {
         if (findExists(req.session.role, levels.user)) {
             try {
-                fs.renameSync(req.file.path, req.file.path + req.body.olc + ".jpg");
+                fs.renameSync(req.file.path, req.file.path + "-" + req.body.olc + ".jpg");
                 res
                     .status(200)
-                    .json({success: true});
+                    .json({
+                        success: true
+                    });
             } catch (e) {
                 fs.unlinkSync(req.file.path);
                 res
                     .status(500)
-                    .json({success: false});
+                    .json({
+                        success: false
+                    });
             }
         } else {
             fs.unlinkSync(req.file.path);
             res
                 .status(401)
-                .json({success: false});
+                .json({
+                    success: false
+                });
         }
     });
     app.get("/areaOLC", passport.authMiddleware(redisclient), async function (req, res, next) {
@@ -526,7 +538,9 @@ function api(app, redisclient) {
                     longitude: upper[0],
                     latitude: upper[1]
                 }); // keep the distance to one dimension
-                winston.log("info", "DISTANCE:", {distance: distance});
+                winston.log("info", "DISTANCE:", {
+                    distance: distance
+                });
                 // diagonal distance in the view
                 if (user !== undefined && user === req.session.passport.user) {
                     var query = mongooseModels
