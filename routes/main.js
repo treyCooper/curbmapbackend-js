@@ -373,11 +373,19 @@ function api(app, redisclient) {
         if (findExists(req.session.role, levels.user)) {
             try {
                 fs.renameSync(req.file.path, req.file.path + "-" + req.body.olc + ".jpg");
-                res
-                    .status(200)
-                    .json({
-                        success: true
+                if (req.file.size < 10000) {
+                    fs.unlinkSync(req.file.path + "-" + req.body.olc + ".jpg");
+                    res.status(400).json({
+                        success: false,
+                        error: "file too small"
                     });
+                } else {
+                    res
+                        .status(200)
+                        .json({
+                            success: true
+                        });
+                }
             } catch (e) {
                 fs.unlinkSync(req.file.path);
                 res
