@@ -377,7 +377,7 @@ function api(app, redisclient) {
                     fs.unlinkSync(req.file.path + "-" + req.body.olc + ".jpg");
                     res.status(400).json({
                         success: false,
-                        error: "file too small"
+                        error: "file or olc error"
                     });
                 } else {
                     res
