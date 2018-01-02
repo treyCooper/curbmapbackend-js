@@ -364,11 +364,11 @@ function api(app, redisclient) {
     });
 
     app.post("/imageUpload", passport.authMiddleware(redisclient), upload.single("image"), async function (req, res, next) {
-        winston.log('error', req.body)
+        winston.log('warn', "body", req.body)
         if (findExists(req.session.role, levels.user)) {
             try {
                 fs.renameSync(req.file.path, req.file.path + "-" + req.body.olc + "-" + req.body.bearing + ".jpg");
-                if (req.file.size < 10000 || req.body.olc === undefined || req.body.olc === "" || req.body.bearing === undefined || req.body.bearing === "" || typeof(req.body.bearing) !== "number") {
+                if (req.file.size < 10000 || req.body.olc === undefined || req.body.olc === "" || req.body.bearing === undefined || req.body.bearing === "") {
                     fs.unlinkSync(req.file.path + "-" + req.body.olc + ".jpg");
                     res
                         .status(400)
