@@ -366,8 +366,8 @@ function api(app, redisclient) {
     app.post("/imageUpload", passport.authMiddleware(redisclient), upload.single("image"), async function (req, res, next) {
         if (findExists(req.session.role, levels.user)) {
             try {
-                fs.renameSync(req.file.path, req.file.path + "-" + req.body.olc + "-" + req.body.heading + ".jpg");
-                if (req.file.size < 10000 || req.body.olc === undefined || req.body.olc === "" || req.body.heading === undefined || req.body.heading === "") {
+                fs.renameSync(req.file.path, req.file.path + "-" + req.body.olc + "-" + req.body.bearing + ".jpg");
+                if (req.file.size < 10000 || req.body.olc === undefined || req.body.olc === "" || req.body.bearing === undefined || req.body.bearing === "" || typeof(req.body.bearing) !== "number") {
                     fs.unlinkSync(req.file.path + "-" + req.body.olc + ".jpg");
                     res
                         .status(400)
