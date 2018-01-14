@@ -35,7 +35,6 @@ const upload = multer({
     },
     storage: storage
 });
-const Jimp = require("jimp");
 const passport = require("passport");
 const winston = require("winston");
 const MessagingResponse = require("twilio").twiml.MessagingResponse;
@@ -45,12 +44,10 @@ function api(app, redisclient) {
         .post("/addLine", passport.authMiddleware(redisclient), async function (req, res, next) {
             winston.log('info', req.body)
             if (typeof req.body.line !== "object" || req.body.line.length < 2 || // start & end points must exist for line to exist
-                typeof req.body.restrictions !== "object" || req.body.restrictions.length == 0) {
+            typeof req.body.restrictions !== "object" || req.body.restrictions.length == 0) {
                 res
                     .status(400)
-                    .json({
-                        success: false
-                    });
+                    .json({success: false});
             } else {
                 try {
                     if (req.body.parentid === undefined || !mongooseModels.obj_id.isValid(req.body.parentid)) {
@@ -102,21 +99,25 @@ function api(app, redisclient) {
                                         ._id
                                         .toString()
                                 });
+                            for (restr of new_line.restrs) {
+                                postgres.addToLines({
+                                    line_coords: new_line.loc.coordinates,
+                                    line_id: new_line._id,
+                                    restr_id: restr._id,
+                                    date: Date()
+                                }, req.session.userid)
+                            }
                         } else {
                             res
                                 .status(200)
-                                .json({
-                                    success: false
-                                });
+                                .json({success: false});
                         }
                     } else {
                         let parent_id = mongooseModels.obj_id(req.body.parentid);
 
                         let parent = await mongooseModels
                             .parents
-                            .findOne({
-                                "_id": parent_id
-                            })
+                            .findOne({"_id": parent_id})
                             .exec();
                         if (parent !== null) {
                             parent
@@ -178,14 +179,21 @@ function api(app, redisclient) {
                                             ._id
                                             .toString()
                                     });
+                                for (restr of parent.lines[new_length - 1]) {
+                                    postgres.addToLines({
+                                        parent_id: parent._id,
+                                        line_coords: parent.lines[new_length - 1].loc.coordinates,
+                                        line_id: parent.lines[new_length - 1]._id,
+                                        restr_id: restr._id,
+                                        date: Date()
+                                    }, req.session.userid)
+                                }
                             } else {
                                 // we didn't add any new restrictions to the new line, so don't save it to the
                                 // parent line
                                 res
                                     .status(200)
-                                    .json({
-                                        success: false
-                                    });
+                                    .json({success: false});
                             }
                         }
                     }
@@ -220,11 +228,13 @@ function api(app, redisclient) {
                 try {
                     let lines_without_parent = await mongooseModels
                         .linesWithoutParents
-                        .aggregate([{
-                            $match: {
-                                _id: line_id
+                        .aggregate([
+                            {
+                                $match: {
+                                    _id: line_id
+                                }
                             }
-                        }])
+                        ])
                         .exec();
                     if (lines_without_parent >= 1) {
                         let line = lines_without_parent[0];
@@ -233,23 +243,29 @@ function api(app, redisclient) {
                             if (checkRestr(restr)) {
                                 let temp_r = {
                                     tp: restr["type"],
-                                    an: restr["angle"] ?
-                                        restr["angle"] : 0,
+                                    an: restr["angle"]
+                                        ? restr["angle"]
+                                        : 0,
                                     st: restr["start"],
                                     ed: restr["end"],
                                     ds: restr["days"],
                                     wk: restr["weeks"],
                                     mn: restr["months"],
-                                    lt: restr["limit"] ?
-                                        restr["limit"] : null,
-                                    pm: restr["permit"] ?
-                                        restr["permit"] : null,
-                                    ct: restr["cost"] ?
-                                        restr["cost"] : null,
-                                    pr: restr["per"] ?
-                                        restr["per"] : null,
-                                    ve: restr["vehicle"] ?
-                                        true : false,
+                                    lt: restr["limit"]
+                                        ? restr["limit"]
+                                        : null,
+                                    pm: restr["permit"]
+                                        ? restr["permit"]
+                                        : null,
+                                    ct: restr["cost"]
+                                        ? restr["cost"]
+                                        : null,
+                                    pr: restr["per"]
+                                        ? restr["per"]
+                                        : null,
+                                    ve: restr["vehicle"]
+                                        ? true
+                                        : false,
                                     up: 0,
                                     dn: 0,
                                     by: req.session.userid
@@ -257,22 +273,24 @@ function api(app, redisclient) {
                                 line
                                     .restrs
                                     .push(temp_r);
+                                postgres.addToLines({
+                                    line_coords: line.loc.coordinates,
+                                    line_id: line._id,
+                                    restr_id: line.restrs[line.restrs.length - 1]._id,
+                                    date: Date()
+                                }, req.session.userid)
                             }
                         }
                         await line.save();
                         res
                             .status(200)
-                            .json({
-                                success: true
-                            });
+                            .json({success: true});
                     }
                 } catch (err) {
                     // couldn't find parent or something went wrong with search
                     res
                         .status(400)
-                        .json({
-                            success: false
-                        });
+                        .json({success: false});
                 }
             } else {
                 // Add a restriction to a line with a parent
@@ -281,9 +299,7 @@ function api(app, redisclient) {
                     let parent_id = mongooseModels.obj_id(req.body.parentid);
                     let the_line_parent = await mongooseModels
                         .parents
-                        .findOne({
-                            _id: parent_id
-                        })
+                        .findOne({_id: parent_id})
                         .exec();
                     if (the_line_parent !== null) {
                         // we found the parent line, now find the sub-line segment
@@ -294,58 +310,71 @@ function api(app, redisclient) {
                                 break;
                             }
                         }
-                        for (restr in req.body.restrictions) {
-                            if (checkRestr(restr)) {
-                                let temp_r = {
-                                    tp: restr["type"],
-                                    an: restr["angle"] ?
-                                        restr["angle"] : 0,
-                                    st: restr["start"],
-                                    ed: restr["end"],
-                                    ds: restr["days"],
-                                    wk: restr["weeks"],
-                                    mn: restr["months"],
-                                    lt: restr["limit"] ?
-                                        restr["limit"] : null,
-                                    pm: restr["permit"] ?
-                                        restr["permit"] : null,
-                                    ct: restr["cost"] ?
-                                        restr["cost"] : null,
-                                    pr: restr["per"] ?
-                                        restr["per"] : null,
-                                    ve: restr["vehicle"] ?
-                                        true : false,
-                                    up: 0,
-                                    dn: 0,
-                                    by: req.session.userid
-                                };
-                                the_line_parent
-                                    .lines[location]
-                                    .restrs
-                                    .push(temp_r);
-                                the_line_parent
-                                    .lines[location]
-                                    .markModified('restrs')
-                                the_line_parent.lines[location].restrs_length += 1;
-                                the_line_parent
-                                    .lines[location]
-                                    .markModified('restrs_length')
-                                the_line_parent.total_types += 1;
-                                the_line_parent.markModified('total_types')
-                                the_line_parent.types_each[restr["type"]] += 1;
-                                the_line_parent.markModified('types_each')
+                        if (location !== -1) {
+                            for (restr in req.body.restrictions) {
+                                if (checkRestr(restr)) {
+                                    let temp_r = {
+                                        tp: restr["type"],
+                                        an: restr["angle"]
+                                            ? restr["angle"]
+                                            : 0,
+                                        st: restr["start"],
+                                        ed: restr["end"],
+                                        ds: restr["days"],
+                                        wk: restr["weeks"],
+                                        mn: restr["months"],
+                                        lt: restr["limit"]
+                                            ? restr["limit"]
+                                            : null,
+                                        pm: restr["permit"]
+                                            ? restr["permit"]
+                                            : null,
+                                        ct: restr["cost"]
+                                            ? restr["cost"]
+                                            : null,
+                                        pr: restr["per"]
+                                            ? restr["per"]
+                                            : null,
+                                        ve: restr["vehicle"]
+                                            ? true
+                                            : false,
+                                        up: 0,
+                                        dn: 0,
+                                        by: req.session.userid
+                                    };
+                                    the_line_parent
+                                        .lines[location]
+                                        .restrs
+                                        .push(temp_r);
+                                    postgres.addToLines({
+                                        line_coords: the_line_parent.lines[location].loc.coordinates,
+                                        parent_id: the_line_parent._id,
+                                        line_id: the_line_parent.lines[location]._id,
+                                        restr_id: the_line_parent.lines[location].restrs[the_line_parent.lines[location].restrs.length - 1]._id,
+                                        date: Date()
+                                    }, req.session.userid)
+                                    the_line_parent
+                                        .lines[location]
+                                        .markModified('restrs')
+                                    the_line_parent.lines[location].restrs_length += 1;
+                                    the_line_parent
+                                        .lines[location]
+                                        .markModified('restrs_length')
+                                    the_line_parent.total_types += 1;
+                                    the_line_parent.markModified('total_types')
+                                    the_line_parent.types_each[restr["type"]] += 1;
+                                    the_line_parent.markModified('types_each')
+                                }
                             }
+                            // once we have added all the data to the old parent object, resave it
+                            await the_line_parent.save();
                         }
-                        // once we have added all the data to the old parent object, resave it
-                        await the_line_parent.save();
                     }
                 } catch (error) {
                     // Something happened in the query
                     res
                         .status(400)
-                        .json({
-                            success: false
-                        });
+                        .json({success: false});
                 }
             }
         } else {
@@ -353,9 +382,7 @@ function api(app, redisclient) {
             // don't know what line to add to
             res
                 .status(400)
-                .json({
-                    success: false
-                });
+                .json({success: false});
         }
     });
 
@@ -368,9 +395,7 @@ function api(app, redisclient) {
             time: new Date()
         };
         fs.appendFileSync("textmessages.json", JSON.stringify(tempJSON));
-        res.writeHead(200, {
-            "Content-Type": "text/xml"
-        });
+        res.writeHead(200, {"Content-Type": "text/xml"});
         res.end(twilmsg.toString());
     });
 
@@ -383,32 +408,28 @@ function api(app, redisclient) {
                     fs.unlinkSync(req.file.path + "-" + req.body.olc + ".jpg");
                     res
                         .status(400)
-                        .json({
-                            success: false,
-                            error: "file or olc error"
-                        });
+                        .json({success: false, error: "file or olc error"});
                 } else {
                     res
                         .status(200)
-                        .json({
-                            success: true
-                        });
+                        .json({success: true});
+                    postgres.addToPhotos({
+                        olc: req.body.olc,
+                        filename: req.file.path + "-" + req.body.olc + "-" + req.body.bearing + ".jpg",
+                        date: Date()
+                    }, req.session.userid)
                 }
             } catch (e) {
                 fs.unlinkSync(req.file.path);
                 res
                     .status(500)
-                    .json({
-                        success: false
-                    });
+                    .json({success: false});
             }
         } else {
             fs.unlinkSync(req.file.path);
             res
                 .status(401)
-                .json({
-                    success: false
-                });
+                .json({success: false});
         }
     });
     app.get("/areaOLC", passport.authMiddleware(redisclient), async function (req, res, next) {
@@ -554,9 +575,7 @@ function api(app, redisclient) {
                     longitude: upper[0],
                     latitude: upper[1]
                 }); // keep the distance to one dimension
-                winston.log("info", "DISTANCE:", {
-                    distance: distance
-                });
+                winston.log("info", "DISTANCE:", {distance: distance});
                 // diagonal distance in the view
                 if (user !== undefined && user === req.session.passport.user) {
                     var query = mongooseModels
@@ -675,24 +694,7 @@ var findExists = function (needle, haystack) {
 };
 
 var checkRestr = function (restr) {
-    return (restr.type !== undefined &&
-        checkDurationForType(restr.type, restr.duration) &&
-        checkPermitForType(restr.type, restr.permit) &&
-        checkCostForType(restr.type, restr.cost, restr.per) &&
-        restr.side !== undefined &&
-        restr.angle !== undefined &&
-        typeof restr.days === "object" &&
-        restr.days.length === 7 &&
-        typeof restr.weeks === "object" &&
-        restr.weeks.length === 4 &&
-        typeof restr.months === "object" &&
-        restr.months.length === 12 &&
-        restr.start !== undefined &&
-        restr.start >= 0 &&
-        restr.start <= 1440 &&
-        restr.end >= 0 &&
-        restr.end <= 1440
-    );
+    return (restr.type !== undefined && checkDurationForType(restr.type, restr.duration) && checkPermitForType(restr.type, restr.permit) && checkCostForType(restr.type, restr.cost, restr.per) && restr.side !== undefined && restr.angle !== undefined && typeof restr.days === "object" && restr.days.length === 7 && typeof restr.weeks === "object" && restr.weeks.length === 4 && typeof restr.months === "object" && restr.months.length === 12 && restr.start !== undefined && restr.start >= 0 && restr.start <= 1440 && restr.end >= 0 && restr.end <= 1440);
 };
 
 var checkDurationForType = function (type, duration) {
