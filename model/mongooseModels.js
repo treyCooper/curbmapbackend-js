@@ -5,6 +5,15 @@ const uri = `mongodb://${process.env.MONGO_SHARD_0},${process.env.MONGO_SHARD_1}
 
 // mongoose.connect(uri);
 mongoose.Promise = require("bluebird");
+const PhotosSchema = new mongoose.Schema({
+    userid: {
+        type: String,
+        index: true
+    },
+    filename: String,
+    date: Date,
+    size: Number
+}, {collection: "Photos"})
 
 const HeatMapSchema = new mongoose.Schema({
     six_sig_olc: {
