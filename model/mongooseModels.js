@@ -6,24 +6,7 @@ const uri = `mongodb://${process.env.MONGO_SHARD_0},${process.env.MONGO_SHARD_1}
 // mongoose.connect(uri);
 mongoose.Promise = require("bluebird");
 
-const HeatMapSchema = new mongoose.Schema({
-    six_sig_olc: {
-        type: String,
-        index: true
-    }, // Must actually be full 9 characters with two 00 padding and +
-    corners: [
-        [
-            {
-                type: Number
-            }
-        ]
-    ], // Two opposite corners of region (most likely NW, SE)
-    total_types: {
-        type: Number,
-        default: 0
-    },
-    types_each: [Number] // Processed in batch on the backend, 14 or however types we end up having
-}, {collection: "HeatMaps"});
+const BoxSchema = new mongoose.Schema({origin_x: Number, origin_y: Number, width: Number, height: Number, categories: [String]})
 
 const RestrSchema = new mongoose.Schema({
     tp: Number, // type {0-13}
@@ -43,6 +26,53 @@ const RestrSchema = new mongoose.Schema({
     by: String, // by user id
     ud: mongoose.SchemaTypes.Date // updatedOn
 }, {usePushEach: true});
+
+const ClassificationSchema = new mongoose.Schema({
+    userid: {
+        type: String,
+        index: true
+    },
+    type: Number, // 0 for labeling, 1 for verification of labeling, 2 for analysis of sign
+    boxes: {
+        type: [BoxSchema],
+        default: []
+    },
+    content: {
+        type: [RestrSchema],
+        default: []
+    },
+    date: Date
+})
+
+const PhotosSchema = new mongoose.Schema({
+    userid: {
+        type: String,
+        index: true
+    },
+    filename: String,
+    date: Date,
+    size: Number,
+    classifications: [ClassificationSchema]
+}, {collection: "Photos"})
+
+const HeatMapSchema = new mongoose.Schema({
+    six_sig_olc: {
+        type: String,
+        index: true
+    }, // Must actually be full 9 characters with two 00 padding and +
+    corners: [
+        [
+            {
+                type: Number
+            }
+        ]
+    ], // Two opposite corners of region (most likely NW, SE)
+    total_types: {
+        type: Number,
+        default: 0
+    },
+    types_each: [Number] // Processed in batch on the backend, 14 or however types we end up having
+}, {collection: "HeatMaps"});
 
 const MapLineSchema = new mongoose.Schema({
     loc: {
@@ -111,6 +141,10 @@ const MapLineParentSchema = new mongoose.Schema({
 const MapLineParents = mongoose.model("MapLines", MapLineParentSchema);
 const MapLinesWithoutParents = mongoose.model("Lines", MapLineWithoutParentsSchema);
 const HeatMaps = mongoose.model("HeatMaps", HeatMapSchema);
+const Photos = mongoose.model("Photos", PhotosSchema);
+const Classifications = mongoose.model("Classifications", ClassificationSchema)
+const Boxes = mongoose.model("Boxes", BoxSchema)
+
 mongoose.connect(uri, {
     user: process.env.MAPDB_USERNAME,
     pass: process.env.MAPDB_PASSWORD,
@@ -120,5 +154,6 @@ mongoose.connect(uri, {
 module.exports = {
     parents: MapLineParents,
     linesWithoutParents: MapLinesWithoutParents,
+    photos: Photos,
     obj_id: mongoose.Types.ObjectId
 };
