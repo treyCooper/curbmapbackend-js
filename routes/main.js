@@ -42,7 +42,6 @@ const MessagingResponse = require("twilio").twiml.MessagingResponse;
 function api(app, redisclient) {
     app
         .post("/addLine", passport.authMiddleware(redisclient), async function (req, res, next) {
-            winston.log('info', req.body)
             if (typeof req.body.line !== "object" || req.body.line.length < 2 || // start & end points must exist for line to exist
             typeof req.body.restrictions !== "object" || req.body.restrictions.length == 0) {
                 res
@@ -403,21 +402,24 @@ function api(app, redisclient) {
         winston.log('warn', "body", req.body)
         if (findExists(req.session.role, levels.user)) {
             try {
-                fs.renameSync(req.file.path, req.file.path + "-" + req.body.olc + "-" + req.body.bearing + ".jpg");
+                let newFilePath = req.file.path + "-" + req.body.olc + "-" + req.body.bearing + ".jpg"
+                fs.renameSync(req.file.path, newFilePath);
                 if (req.file.size < 10000 || req.body.olc === undefined || req.body.olc === "" || req.body.bearing === undefined || req.body.bearing === "") {
-                    fs.unlinkSync(req.file.path + "-" + req.body.olc + ".jpg");
+                    fs.unlinkSync(newFilePath);
                     res
                         .status(400)
                         .json({success: false, error: "file or olc error"});
                 } else {
+                    postgres.addToPhotos({
+                        olc: req.body.olc,
+                        filename: newFilePath,
+                        date: Date()
+                    }, req.session.userid)
+                    let photo = new mongooseModels.photos({userid: req.session.userid, filename: newFilePath, date: Date(), size: req.file.size, classifications: []})
+                    await photo.save();
                     res
                         .status(200)
                         .json({success: true});
-                    postgres.addToPhotos({
-                        olc: req.body.olc,
-                        filename: req.file.path + "-" + req.body.olc + "-" + req.body.bearing + ".jpg",
-                        date: Date()
-                    }, req.session.userid)
                 }
             } catch (e) {
                 fs.unlinkSync(req.file.path);

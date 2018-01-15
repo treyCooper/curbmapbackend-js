@@ -1,3 +1,5 @@
+import {Mongoose} from "mongoose";
+
 "use strict";
 const mongoose = require("mongoose");
 const GeoJSON = require("mongoose-geojson-schema");
@@ -12,8 +14,28 @@ const PhotosSchema = new mongoose.Schema({
     },
     filename: String,
     date: Date,
-    size: Number
+    size: Number,
+    classifications: [ClassificationSchema]
 }, {collection: "Photos"})
+
+const ClassificationSchema = new mongoose.Schema({
+    userid: {
+        type: String,
+        index: true
+    },
+    type: Number, // 0 for labeling, 1 for verification of labeling, 2 for analysis of sign
+    boxes: {
+        type: [BoxSchema],
+        default: []
+    },
+    content: {
+        type: [RestrSchema],
+        default: []
+    },
+    date: Date
+})
+
+const BoxSchema = new mongoose.Schema({origin_x: Number, origin_y: Number, width: Number, height: Number, categories: [String]})
 
 const HeatMapSchema = new mongoose.Schema({
     six_sig_olc: {
@@ -120,6 +142,10 @@ const MapLineParentSchema = new mongoose.Schema({
 const MapLineParents = mongoose.model("MapLines", MapLineParentSchema);
 const MapLinesWithoutParents = mongoose.model("Lines", MapLineWithoutParentsSchema);
 const HeatMaps = mongoose.model("HeatMaps", HeatMapSchema);
+const Photos = mongoose.model("Photos", PhotosSchema);
+const Classifications = mongoose.model("Classifications", ClassificationSchema)
+const Boxes = mongoose.model("Boxes", BoxSchema)
+
 mongoose.connect(uri, {
     user: process.env.MAPDB_USERNAME,
     pass: process.env.MAPDB_PASSWORD,
@@ -129,5 +155,6 @@ mongoose.connect(uri, {
 module.exports = {
     parents: MapLineParents,
     linesWithoutParents: MapLinesWithoutParents,
+    photos: Photos,
     obj_id: mongoose.Types.ObjectId
 };
