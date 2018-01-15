@@ -1,5 +1,3 @@
-import {Mongoose} from "mongoose";
-
 "use strict";
 const mongoose = require("mongoose");
 const GeoJSON = require("mongoose-geojson-schema");
@@ -7,54 +5,8 @@ const uri = `mongodb://${process.env.MONGO_SHARD_0},${process.env.MONGO_SHARD_1}
 
 // mongoose.connect(uri);
 mongoose.Promise = require("bluebird");
-const PhotosSchema = new mongoose.Schema({
-    userid: {
-        type: String,
-        index: true
-    },
-    filename: String,
-    date: Date,
-    size: Number,
-    classifications: [ClassificationSchema]
-}, {collection: "Photos"})
-
-const ClassificationSchema = new mongoose.Schema({
-    userid: {
-        type: String,
-        index: true
-    },
-    type: Number, // 0 for labeling, 1 for verification of labeling, 2 for analysis of sign
-    boxes: {
-        type: [BoxSchema],
-        default: []
-    },
-    content: {
-        type: [RestrSchema],
-        default: []
-    },
-    date: Date
-})
 
 const BoxSchema = new mongoose.Schema({origin_x: Number, origin_y: Number, width: Number, height: Number, categories: [String]})
-
-const HeatMapSchema = new mongoose.Schema({
-    six_sig_olc: {
-        type: String,
-        index: true
-    }, // Must actually be full 9 characters with two 00 padding and +
-    corners: [
-        [
-            {
-                type: Number
-            }
-        ]
-    ], // Two opposite corners of region (most likely NW, SE)
-    total_types: {
-        type: Number,
-        default: 0
-    },
-    types_each: [Number] // Processed in batch on the backend, 14 or however types we end up having
-}, {collection: "HeatMaps"});
 
 const RestrSchema = new mongoose.Schema({
     tp: Number, // type {0-13}
@@ -74,6 +26,53 @@ const RestrSchema = new mongoose.Schema({
     by: String, // by user id
     ud: mongoose.SchemaTypes.Date // updatedOn
 }, {usePushEach: true});
+
+const ClassificationSchema = new mongoose.Schema({
+    userid: {
+        type: String,
+        index: true
+    },
+    type: Number, // 0 for labeling, 1 for verification of labeling, 2 for analysis of sign
+    boxes: {
+        type: [BoxSchema],
+        default: []
+    },
+    content: {
+        type: [RestrSchema],
+        default: []
+    },
+    date: Date
+})
+
+const PhotosSchema = new mongoose.Schema({
+    userid: {
+        type: String,
+        index: true
+    },
+    filename: String,
+    date: Date,
+    size: Number,
+    classifications: [ClassificationSchema]
+}, {collection: "Photos"})
+
+const HeatMapSchema = new mongoose.Schema({
+    six_sig_olc: {
+        type: String,
+        index: true
+    }, // Must actually be full 9 characters with two 00 padding and +
+    corners: [
+        [
+            {
+                type: Number
+            }
+        ]
+    ], // Two opposite corners of region (most likely NW, SE)
+    total_types: {
+        type: Number,
+        default: 0
+    },
+    types_each: [Number] // Processed in batch on the backend, 14 or however types we end up having
+}, {collection: "HeatMaps"});
 
 const MapLineSchema = new mongoose.Schema({
     loc: {
