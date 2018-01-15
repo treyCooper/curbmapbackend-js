@@ -43,9 +43,9 @@ app.use(cors(corsOptions));
 app.use(compression());
 app.use(logger("dev"));
 app.use(cookieParser());
-// routes can also get the body
-app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
+app.use(bodyParser.json());
+// routes can also get the body
 app.use(express.static(path.join(__dirname, "public")));
 
 function shouldCompress(req, res) {

@@ -5,6 +5,45 @@ const uri = `mongodb://${process.env.MONGO_SHARD_0},${process.env.MONGO_SHARD_1}
 
 // mongoose.connect(uri);
 mongoose.Promise = require("bluebird");
+
+const BoxSchema = new mongoose.Schema({origin_x: Number, origin_y: Number, width: Number, height: Number, categories: [String]})
+
+const RestrSchema = new mongoose.Schema({
+    tp: Number, // type {0-13}
+    an: Number, // angle
+    st: Number, // start
+    ed: Number, // end
+    ds: [Boolean], // days in effect
+    wk: [Boolean], // weeks in effect
+    mn: [Boolean], // months in effect
+    lt: Number, // limit
+    pm: String, // permit
+    ct: Number, // cost
+    pr: Number, // per
+    mo: Boolean, // motorcycle parking space
+    up: Number, // upVotes
+    dn: Number, // downVotes
+    by: String, // by user id
+    ud: mongoose.SchemaTypes.Date // updatedOn
+}, {usePushEach: true});
+
+const ClassificationSchema = new mongoose.Schema({
+    userid: {
+        type: String,
+        index: true
+    },
+    type: Number, // 0 for labeling, 1 for verification of labeling, 2 for analysis of sign
+    boxes: {
+        type: [BoxSchema],
+        default: []
+    },
+    content: {
+        type: [RestrSchema],
+        default: []
+    },
+    date: Date
+})
+
 const PhotosSchema = new mongoose.Schema({
     userid: {
         type: String,
@@ -12,7 +51,8 @@ const PhotosSchema = new mongoose.Schema({
     },
     filename: String,
     date: Date,
-    size: Number
+    size: Number,
+    classifications: [ClassificationSchema]
 }, {collection: "Photos"})
 
 const HeatMapSchema = new mongoose.Schema({
@@ -33,25 +73,6 @@ const HeatMapSchema = new mongoose.Schema({
     },
     types_each: [Number] // Processed in batch on the backend, 14 or however types we end up having
 }, {collection: "HeatMaps"});
-
-const RestrSchema = new mongoose.Schema({
-    tp: Number, // type {0-13}
-    an: Number, // angle
-    st: Number, // start
-    ed: Number, // end
-    ds: [Boolean], // days in effect
-    wk: [Boolean], // weeks in effect
-    mn: [Boolean], // months in effect
-    lt: Number, // limit
-    pm: String, // permit
-    ct: Number, // cost
-    pr: Number, // per
-    mo: Boolean, // motorcycle parking space
-    up: Number, // upVotes
-    dn: Number, // downVotes
-    by: String, // by user id
-    ud: mongoose.SchemaTypes.Date // updatedOn
-}, {usePushEach: true});
 
 const MapLineSchema = new mongoose.Schema({
     loc: {
@@ -120,6 +141,10 @@ const MapLineParentSchema = new mongoose.Schema({
 const MapLineParents = mongoose.model("MapLines", MapLineParentSchema);
 const MapLinesWithoutParents = mongoose.model("Lines", MapLineWithoutParentsSchema);
 const HeatMaps = mongoose.model("HeatMaps", HeatMapSchema);
+const Photos = mongoose.model("Photos", PhotosSchema);
+const Classifications = mongoose.model("Classifications", ClassificationSchema)
+const Boxes = mongoose.model("Boxes", BoxSchema)
+
 mongoose.connect(uri, {
     user: process.env.MAPDB_USERNAME,
     pass: process.env.MAPDB_PASSWORD,
@@ -129,5 +154,6 @@ mongoose.connect(uri, {
 module.exports = {
     parents: MapLineParents,
     linesWithoutParents: MapLinesWithoutParents,
+    photos: Photos,
     obj_id: mongoose.Types.ObjectId
 };
