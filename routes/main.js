@@ -10,7 +10,9 @@ const isNull = require("util").isNull;
 const uuidv1 = require("uuid/v1");
 const twilio = require("twilio");
 const twilclient = new twilio(process.env.TWILIOSID, process.env.TWILIOAUTH);
-const onCallList = ["+16266162685"];
+
+const onCallList = process.env.ONCALLLIST.split(",");
+
 const levels = {
   user: ["ROLE_USER", "ROLE_ADMIN", "ROLE_OWNER"],
   admin: ["ROLE_ADMIN", "ROLE_OWNER"],

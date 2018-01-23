@@ -1,14 +1,32 @@
 "use strict";
 const mongoose = require("mongoose");
 const GeoJSON = require("mongoose-geojson-schema");
-const uri = `mongodb://${process.env.MONGO_SHARD_0},${process.env.MONGO_SHARD_1},${process.env.MONGO_SHARD_2}/${process.env.MONGO_DB}?ssl=true&replicaSet=${process.env.MONGO_REPLSET}&authSource=admin`;
+let uri = "";
+if (process.env.ENVIRONMENT === "TESTING") {
+  uri = `mongodb://${process.env.MONGO}/${
+    process.env.MONGO_DB
+  }?ssl=true&authSource=admin`;
+} else {
+  uri = `mongodb://${process.env.MONGO_SHARD_0},${process.env.MONGO_SHARD_1},${
+    process.env.MONGO_SHARD_2
+  }/${process.env.MONGO_DB}?ssl=true&replicaSet=${
+    process.env.MONGO_REPLSET
+  }&authSource=admin`;
+}
 
 // mongoose.connect(uri);
 mongoose.Promise = require("bluebird");
 
-const BoxSchema = new mongoose.Schema({origin_x: Number, origin_y: Number, width: Number, height: Number, categories: [String]})
+const BoxSchema = new mongoose.Schema({
+  origin_x: Number,
+  origin_y: Number,
+  width: Number,
+  height: Number,
+  categories: [String]
+});
 
-const RestrSchema = new mongoose.Schema({
+const RestrSchema = new mongoose.Schema(
+  {
     tp: Number, // type {0-13}
     an: Number, // angle
     st: Number, // start
@@ -25,93 +43,108 @@ const RestrSchema = new mongoose.Schema({
     dn: Number, // downVotes
     by: String, // by user id
     ud: mongoose.SchemaTypes.Date // updatedOn
-}, {usePushEach: true});
+  },
+  { usePushEach: true }
+);
 
 const ClassificationSchema = new mongoose.Schema({
-    userid: {
-        type: String,
-        index: true
-    },
-    type: Number, // 0 for labeling, 1 for verification of labeling, 2 for analysis of sign
-    boxes: {
-        type: [BoxSchema],
-        default: []
-    },
-    content: {
-        type: [RestrSchema],
-        default: []
-    },
-    date: Date
-})
+  userid: {
+    type: String,
+    index: true
+  },
+  type: Number, // 0 for labeling, 1 for verification of labeling, 2 for analysis of sign
+  boxes: {
+    type: [BoxSchema],
+    default: []
+  },
+  content: {
+    type: [RestrSchema],
+    default: []
+  },
+  date: Date
+});
 
-const PhotosSchema = new mongoose.Schema({
+const PhotosSchema = new mongoose.Schema(
+  {
     userid: {
-        type: String,
-        index: true
+      type: String,
+      index: true
     },
     filename: String,
     date: Date,
     size: Number,
     classifications: [ClassificationSchema]
-}, {collection: "Photos"})
+  },
+  { collection: "Photos" }
+);
 
-const HeatMapSchema = new mongoose.Schema({
+const HeatMapSchema = new mongoose.Schema(
+  {
     six_sig_olc: {
-        type: String,
-        index: true
+      type: String,
+      index: true
     }, // Must actually be full 9 characters with two 00 padding and +
     corners: [
-        [
-            {
-                type: Number
-            }
-        ]
+      [
+        {
+          type: Number
+        }
+      ]
     ], // Two opposite corners of region (most likely NW, SE)
     total_types: {
-        type: Number,
-        default: 0
+      type: Number,
+      default: 0
     },
     types_each: [Number] // Processed in batch on the backend, 14 or however types we end up having
-}, {collection: "HeatMaps"});
+  },
+  { collection: "HeatMaps" }
+);
 
-const MapLineSchema = new mongoose.Schema({
+const MapLineSchema = new mongoose.Schema(
+  {
     loc: {
-        type: mongoose.Schema.Types.LineString,
-        index: "2dsphere"
+      type: mongoose.Schema.Types.LineString,
+      index: "2dsphere"
     },
     restrs_length: {
-        type: Number,
-        default: 0
+      type: Number,
+      default: 0
     },
     restrs: {
-        type: [RestrSchema],
-        default: []
+      type: [RestrSchema],
+      default: []
     }
-}, {usePushEach: true});
+  },
+  { usePushEach: true }
+);
 
-const MapLineWithoutParentsSchema = new mongoose.Schema({
+const MapLineWithoutParentsSchema = new mongoose.Schema(
+  {
     loc: {
-        type: mongoose.Schema.Types.LineString,
-        index: "2dsphere"
+      type: mongoose.Schema.Types.LineString,
+      index: "2dsphere"
     },
     restrs_length: {
-        type: Number,
-        default: 0
+      type: Number,
+      default: 0
     },
     restrs: {
-        type: [RestrSchema],
-        default: []
+      type: [RestrSchema],
+      default: []
     }
-}, {
+  },
+  {
     collection: "Lines",
     usePushEach: true
-});
+  }
+);
 
-const MapLineParentSchema = new mongoose.Schema({
+const MapLineParentSchema = new mongoose.Schema(
+  {
     local_map_code: String, // i.e. CAMS id
     loc: {
-        type: mongoose.Schema.Types.LineString,
-        index: "2dsphere"
+      type: mongoose.Schema.Types.LineString,
+      index: "2dsphere"
     },
     fullname: String,
     status: String,
@@ -121,39 +154,44 @@ const MapLineParentSchema = new mongoose.Schema({
     to: Number,
     zip: Number,
     total_types: {
-        type: Number,
-        default: 0
+      type: Number,
+      default: 0
     },
     types_each: [Number], // Processed in batch on the backend, 14 or however types we end up having
     lines_length: {
-        type: Number,
-        default: 0
+      type: Number,
+      default: 0
     },
     lines: {
-        type: [MapLineSchema],
-        default: []
+      type: [MapLineSchema],
+      default: []
     }
-}, {
+  },
+  {
     collection: "MapLines",
     usePushEach: true
-});
+  }
+);
 
 const MapLineParents = mongoose.model("MapLines", MapLineParentSchema);
-const MapLinesWithoutParents = mongoose.model("Lines", MapLineWithoutParentsSchema);
+const MapLinesWithoutParents = mongoose.model(
+  "Lines",
+  MapLineWithoutParentsSchema
+);
 const HeatMaps = mongoose.model("HeatMaps", HeatMapSchema);
 const Photos = mongoose.model("Photos", PhotosSchema);
-const Classifications = mongoose.model("Classifications", ClassificationSchema)
-const Boxes = mongoose.model("Boxes", BoxSchema)
+const Classifications = mongoose.model("Classifications", ClassificationSchema);
+const Boxes = mongoose.model("Boxes", BoxSchema);
 
 mongoose.connect(uri, {
-    user: process.env.MAPDB_USERNAME,
-    pass: process.env.MAPDB_PASSWORD,
+  user: process.env.MAPDB_USERNAME,
+  pass: process.env.MAPDB_PASSWORD,
 
-    useMongoClient: true
+  useMongoClient: true
 });
 module.exports = {
-    parents: MapLineParents,
-    linesWithoutParents: MapLinesWithoutParents,
-    photos: Photos,
-    obj_id: mongoose.Types.ObjectId
+  parents: MapLineParents,
+  linesWithoutParents: MapLinesWithoutParents,
+  photos: Photos,
+  obj_id: mongoose.Types.ObjectId
 };
