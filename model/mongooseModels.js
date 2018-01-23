@@ -3,9 +3,10 @@ const mongoose = require("mongoose");
 const GeoJSON = require("mongoose-geojson-schema");
 let uri = "";
 if (process.env.ENVIRONMENT === "TESTING") {
-  uri = `mongodb://${process.env.MONGO}/${
-    process.env.MONGO_DB
-  }?ssl=true&authSource=admin`;
+  console.log("TESTING");
+  uri = `mongodb://${process.env.MAPDB_USERNAME}:${
+    process.env.MAPDB_PASSWORD
+  }@${process.env.MONGO}/${process.env.MONGO_DB}?ssl=true&authSource=admin`;
 } else {
   uri = `mongodb://${process.env.MONGO_SHARD_0},${process.env.MONGO_SHARD_1},${
     process.env.MONGO_SHARD_2
