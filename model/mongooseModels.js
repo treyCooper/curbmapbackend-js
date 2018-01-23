@@ -6,7 +6,7 @@ if (process.env.ENVIRONMENT === "TESTING") {
   console.log("TESTING");
   uri = `mongodb://${process.env.MAPDB_USERNAME}:${
     process.env.MAPDB_PASSWORD
-  }@${process.env.MONGO}/${process.env.MONGO_DB}?ssl=true&authSource=admin`;
+  }@${process.env.MONGO}/${process.env.MONGO_DB}?authSource=admin`;
 } else {
   uri = `mongodb://${process.env.MONGO_SHARD_0},${process.env.MONGO_SHARD_1},${
     process.env.MONGO_SHARD_2
