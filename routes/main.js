@@ -9,6 +9,7 @@ const fs = require("fs");
 const isNull = require("util").isNull;
 const uuidv1 = require("uuid/v1");
 const twilio = require("twilio");
+const sharp = require("sharp");
 const twilclient = new twilio(process.env.TWILIOSID, process.env.TWILIOAUTH);
 
 const onCallList = process.env.ONCALLLIST.split(",");
@@ -51,14 +52,30 @@ function api(app, redisclient) {
       }
     };
     var fileName = req.params.name;
-    res.sendFile(fileName, options, function(err) {
-      if (err) {
-        res.status(404).json({ error: "no file" });
-      } else {
-        console.log("Sent:", fileName);
-      }
-    });
+    if (fileName.includes("-text.jpg")) {
+      res.sendFile(fileName, options, function(err) {
+        if (err) {
+          res.status(404).json({ error: "no file" });
+        } else {
+          console.log("Sent:", fileName);
+        }
+      });
+    } else if (!fileName.includes("jpg")) {
+      sharp(__dirname + "/../uploads/" + fileName)
+        .resize(800)
+        .toBuffer()
+        .then(data => {
+          res.contentType("jpeg");
+          res.end(data);
+        })
+        .catch(err => {
+          res.status(500).json({ error: "something happened" });
+        });
+    }
   });
+
+  function completeSend(buffer) {}
+
   app.post("/addLine", passport.authMiddleware(redisclient), async function(
     req,
     res,
@@ -398,7 +415,7 @@ function api(app, redisclient) {
   });
 
   app.post(
-    "/imageUpload",
+    "/imageUploadText",
     passport.authMiddleware(redisclient),
     upload.single("image"),
     async function(req, res, next) {
@@ -411,7 +428,7 @@ function api(app, redisclient) {
             req.body.olc +
             "-" +
             req.body.bearing +
-            ".jpg";
+            "-text.jpg";
           winston.log("error", fs.existsSync(req.file.path));
           fs.renameSync(req.file.path, newFilePath);
           if (
@@ -421,13 +438,92 @@ function api(app, redisclient) {
             req.body.bearing === undefined ||
             req.body.bearing === "" ||
             req.body.date === "" ||
-            req.body.date === undefined
+            req.body.date === undefined ||
+            req.body.token === "" ||
+            req.body.token === undefined
           ) {
             fs.unlinkSync(newFilePath);
             res
               .status(400)
               .json({ success: false, error: "file or olc error" });
           } else {
+            postgres.addToPhotos(
+              {
+                olc: req.body.olc,
+                filename: newFilePath,
+                date: Date()
+              },
+              req.session.userid
+            );
+            let code = uuidv1();
+            let photo = new mongooseModels.photosText({
+              localid: req.body.id,
+              userid: req.session.userid,
+              code,
+              filename: newFilePath,
+              token: req.body.token,
+              date: Date(),
+              size: req.file.size,
+              canPark: false
+            });
+            for (let recipient of onCallList) {
+              twilclient.messages
+                .create({
+                  body:
+                    "Copy this code: " +
+                    code +
+                    " and reply with Y/N for current user's date:" +
+                    req.body.date,
+                  to: recipient,
+                  from: "+12132635292",
+                  mediaUrl: "https://6eb1378e.ngrok.io/" + newFilePath
+                })
+                .then(message => console.log(message.sid));
+            }
+            await photo.save();
+            res.status(200).json({ success: true });
+          }
+        } catch (e) {
+          fs.unlinkSync(newFilePath);
+          res.status(500).json({ success: false });
+        }
+      } else {
+        fs.unlinkSync(req.file.path);
+        res.status(401).json({ success: false });
+      }
+    }
+  );
+
+  app.post(
+    "/imageUpload",
+    passport.authMiddleware(redisclient),
+    upload.single("image"),
+    async function(req, res, next) {
+      winston.log("warn", "body", req.body);
+      if (findExists(req.session.role, levels.user)) {
+        try {
+          if (
+            req.file.size < 10000 ||
+            req.body.olc === undefined ||
+            req.body.olc === ""
+          ) {
+            fs.unlinkSync(req.file.path);
+            res
+              .status(400)
+              .json({ success: false, error: "file or olc error" });
+          } else {
+            if (req.body.bearing === undefined || req.body.bearing === "") {
+              req.body.bearing = 0.0;
+            }
+            let newFilePath =
+              req.file.path +
+              "-" +
+              req.body.olc +
+              "-" +
+              req.body.bearing +
+              ".jpg";
+            winston.log("error", fs.existsSync(req.file.path));
+            fs.renameSync(req.file.path, newFilePath);
             postgres.addToPhotos(
               {
                 olc: req.body.olc,
@@ -443,22 +539,11 @@ function api(app, redisclient) {
               size: req.file.size,
               classifications: []
             });
-            for (let recipient of onCallList) {
-              twilclient.messages
-                .create({
-                  body:
-                    "Reply with Y/N for current user's date:" + req.body.date,
-                  to: recipient,
-                  from: "+12132635292",
-                  mediaUrl: "https://curbmap.com:50003/" + newFilePath
-                })
-                .then(message => console.log(message.sid));
-            }
             await photo.save();
             res.status(200).json({ success: true });
           }
         } catch (e) {
-          fs.unlinkSync(newFilePath);
+          fs.unlinkSync(req.file.path);
           res.status(500).json({ success: false });
         }
       } else {
