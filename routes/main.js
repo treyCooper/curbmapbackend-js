@@ -476,7 +476,7 @@ function api(app, redisclient) {
                     req.body.date,
                   to: recipient,
                   from: "+12132635292",
-                  mediaUrl: "https://6eb1378e.ngrok.io/" + newFilePath
+                  mediaUrl: "https://curbmap.com:50003/" + newFilePath
                 })
                 .then(message => console.log(message.sid));
             }
