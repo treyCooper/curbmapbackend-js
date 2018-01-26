@@ -78,6 +78,34 @@ const PhotosSchema = new mongoose.Schema(
   },
   { collection: "Photos" }
 );
+/*
+              localid: req.body.id,
+              userid: req.session.userid,
+              code,
+              filename: newFilePath,
+              token: req.body.token,
+              date: Date(),
+              size: req.file.size,
+              canpark: false
+*/
+const PhotosTextSchema = new mongoose.Schema(
+  {
+    userid: {
+      type: String,
+      index: true
+    },
+    localid: {
+      type: String
+    },
+    code: String,
+    token: String,
+    filename: String,
+    date: Date,
+    size: Number,
+    canPark: Boolean
+  },
+  { collection: "PhotosText" }
+);
 
 const HeatMapSchema = new mongoose.Schema(
   {
@@ -181,18 +209,18 @@ const MapLinesWithoutParents = mongoose.model(
 );
 const HeatMaps = mongoose.model("HeatMaps", HeatMapSchema);
 const Photos = mongoose.model("Photos", PhotosSchema);
+const PhotosText = mongoose.model("PhotosText", PhotosTextSchema);
 const Classifications = mongoose.model("Classifications", ClassificationSchema);
 const Boxes = mongoose.model("Boxes", BoxSchema);
 
 mongoose.connect(uri, {
   user: process.env.MAPDB_USERNAME,
-  pass: process.env.MAPDB_PASSWORD,
-
-  useMongoClient: true
+  pass: process.env.MAPDB_PASSWORD
 });
 module.exports = {
   parents: MapLineParents,
   linesWithoutParents: MapLinesWithoutParents,
   photos: Photos,
+  photosText: PhotosText,
   obj_id: mongoose.Types.ObjectId
 };
