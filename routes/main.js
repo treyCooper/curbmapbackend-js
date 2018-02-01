@@ -23,10 +23,10 @@ const maxSize = 6 * 1000 * 1000;
 const multer = require("multer");
 
 var storage = multer.diskStorage({
-  destination: function(req, file, cb) {
+  destination: function (req, file, cb) {
     cb(null, "uploads/");
   },
-  filename: function(req, file, cb) {
+  filename: function (req, file, cb) {
     cb(null, req.session.userid + "-" + Date.now());
   }
 });
@@ -42,7 +42,7 @@ const winston = require("winston");
 const MessagingResponse = require("twilio").twiml.MessagingResponse;
 
 function api(app, redisclient) {
-  app.get("/uploads/:name", async function(req, res, next) {
+  app.get("/uploads/:name", async function (req, res, next) {
     var options = {
       root: __dirname + "/../uploads/",
       dotfiles: "deny",
@@ -53,9 +53,11 @@ function api(app, redisclient) {
     };
     var fileName = req.params.name;
     if (fileName.includes("-text.jpg")) {
-      res.sendFile(fileName, options, function(err) {
+      res.sendFile(fileName, options, function (err) {
         if (err) {
-          res.status(404).json({ error: "no file" });
+          res.status(404).json({
+            error: "no file"
+          });
         } else {
           console.log("Sent:", fileName);
         }
@@ -69,14 +71,16 @@ function api(app, redisclient) {
           res.end(data);
         })
         .catch(err => {
-          res.status(500).json({ error: "something happened" });
+          res.status(500).json({
+            error: "something happened"
+          });
         });
     }
   });
 
   function completeSend(buffer) {}
 
-  app.post("/addLine", passport.authMiddleware(redisclient), async function(
+  app.post("/addLine", passport.authMiddleware(redisclient), async function (
     req,
     res,
     next
@@ -87,7 +91,9 @@ function api(app, redisclient) {
       typeof req.body.restrictions !== "object" ||
       req.body.restrictions.length == 0
     ) {
-      res.status(400).json({ success: false });
+      res.status(400).json({
+        success: false
+      });
     } else {
       try {
         if (
@@ -137,8 +143,7 @@ function api(app, redisclient) {
               line_id: new_line._id.toString()
             });
             for (restr of new_line.restrs) {
-              postgres.addToLines(
-                {
+              postgres.addToLines({
                   line_coords: new_line.loc.coordinates,
                   line_id: new_line._id,
                   restr_id: restr._id,
@@ -148,13 +153,17 @@ function api(app, redisclient) {
               );
             }
           } else {
-            res.status(200).json({ success: false });
+            res.status(200).json({
+              success: false
+            });
           }
         } else {
           let parent_id = mongooseModels.obj_id(req.body.parentid);
 
           let parent = await mongooseModels.parents
-            .findOne({ _id: parent_id })
+            .findOne({
+              _id: parent_id
+            })
             .exec();
           if (parent !== null) {
             parent.lines.push({
@@ -207,8 +216,7 @@ function api(app, redisclient) {
                 line_id: parent.lines[new_length - 1]._id.toString()
               });
               for (restr of parent.lines[new_length - 1]) {
-                postgres.addToLines(
-                  {
+                postgres.addToLines({
                     parent_id: parent._id,
                     line_coords: parent.lines[new_length - 1].loc.coordinates,
                     line_id: parent.lines[new_length - 1]._id,
@@ -221,7 +229,9 @@ function api(app, redisclient) {
             } else {
               // we didn't add any new restrictions to the new line, so don't save it to the
               // parent line
-              res.status(200).json({ success: false });
+              res.status(200).json({
+                success: false
+              });
             }
           }
         }
@@ -231,7 +241,7 @@ function api(app, redisclient) {
     }
   });
 
-  app.post("/upVote", passport.authMiddleware(redisclient), function(
+  app.post("/upVote", passport.authMiddleware(redisclient), function (
     req,
     res,
     next
@@ -242,7 +252,7 @@ function api(app, redisclient) {
 
     // TODO: MUST WRITE up Voting of restriction
   });
-  app.post("/downVote", passport.authMiddleware(redisclient), function(
+  app.post("/downVote", passport.authMiddleware(redisclient), function (
     req,
     res,
     next
@@ -257,7 +267,7 @@ function api(app, redisclient) {
   app.post(
     "/addLineRestr",
     passport.authMiddleware(redisclient),
-    async function(req, res, next) {
+    async function (req, res, next) {
       if (
         req.body.lineid !== undefined &&
         mongooseModels.obj_id.isValid(req.body.lineid)
@@ -272,13 +282,11 @@ function api(app, redisclient) {
           // Adding a restriction to a line without a parent
           try {
             let lines_without_parent = await mongooseModels.linesWithoutParents
-              .aggregate([
-                {
-                  $match: {
-                    _id: line_id
-                  }
+              .aggregate([{
+                $match: {
+                  _id: line_id
                 }
-              ])
+              }])
               .exec();
             if (lines_without_parent >= 1) {
               let line = lines_without_parent[0];
@@ -303,8 +311,7 @@ function api(app, redisclient) {
                     by: req.session.userid
                   };
                   line.restrs.push(temp_r);
-                  postgres.addToLines(
-                    {
+                  postgres.addToLines({
                       line_coords: line.loc.coordinates,
                       line_id: line._id,
                       restr_id: line.restrs[line.restrs.length - 1]._id,
@@ -315,11 +322,15 @@ function api(app, redisclient) {
                 }
               }
               await line.save();
-              res.status(200).json({ success: true });
+              res.status(200).json({
+                success: true
+              });
             }
           } catch (err) {
             // couldn't find parent or something went wrong with search
-            res.status(400).json({ success: false });
+            res.status(400).json({
+              success: false
+            });
           }
         } else {
           // Add a restriction to a line with a parent
@@ -327,7 +338,9 @@ function api(app, redisclient) {
             temp_subdocs = {};
             let parent_id = mongooseModels.obj_id(req.body.parentid);
             let the_line_parent = await mongooseModels.parents
-              .findOne({ _id: parent_id })
+              .findOne({
+                _id: parent_id
+              })
               .exec();
             if (the_line_parent !== null) {
               // we found the parent line, now find the sub-line segment
@@ -359,16 +372,13 @@ function api(app, redisclient) {
                       by: req.session.userid
                     };
                     the_line_parent.lines[location].restrs.push(temp_r);
-                    postgres.addToLines(
-                      {
-                        line_coords:
-                          the_line_parent.lines[location].loc.coordinates,
+                    postgres.addToLines({
+                        line_coords: the_line_parent.lines[location].loc.coordinates,
                         parent_id: the_line_parent._id,
                         line_id: the_line_parent.lines[location]._id,
-                        restr_id:
-                          the_line_parent.lines[location].restrs[
-                            the_line_parent.lines[location].restrs.length - 1
-                          ]._id,
+                        restr_id: the_line_parent.lines[location].restrs[
+                          the_line_parent.lines[location].restrs.length - 1
+                        ]._id,
                         date: Date()
                       },
                       req.session.userid
@@ -390,18 +400,22 @@ function api(app, redisclient) {
             }
           } catch (error) {
             // Something happened in the query
-            res.status(400).json({ success: false });
+            res.status(400).json({
+              success: false
+            });
           }
         }
       } else {
         // have to have a line within the parent or on its own to add to. Otherwise, we
         // don't know what line to add to
-        res.status(400).json({ success: false });
+        res.status(400).json({
+          success: false
+        });
       }
     }
   );
 
-  app.post("/getdatafromtext", function(req, res, next) {
+  app.post("/getdatafromtext", function (req, res, next) {
     var twilmsg = new MessagingResponse();
     twilmsg.message("success! Thanks for making curbmap better!");
     const tempJSON = {
@@ -410,7 +424,9 @@ function api(app, redisclient) {
       time: new Date()
     };
     fs.appendFileSync("textmessages.json", JSON.stringify(tempJSON));
-    res.writeHead(200, { "Content-Type": "text/xml" });
+    res.writeHead(200, {
+      "Content-Type": "text/xml"
+    });
     res.end(twilmsg.toString());
   });
 
@@ -418,7 +434,7 @@ function api(app, redisclient) {
     "/imageUploadText",
     passport.authMiddleware(redisclient),
     upload.single("image"),
-    async function(req, res, next) {
+    async function (req, res, next) {
       winston.log("warn", "body", req.body);
       if (findExists(req.session.role, levels.user)) {
         try {
@@ -431,6 +447,7 @@ function api(app, redisclient) {
             "-text.jpg";
           winston.log("error", fs.existsSync(req.file.path));
           fs.renameSync(req.file.path, newFilePath);
+          winston.log('err', 'renamed')
           if (
             req.file.size < 10000 ||
             req.body.olc === undefined ||
@@ -445,16 +462,20 @@ function api(app, redisclient) {
             fs.unlinkSync(newFilePath);
             res
               .status(400)
-              .json({ success: false, error: "file or olc error" });
+              .json({
+                success: false,
+                error: "file or olc error"
+              });
           } else {
-            postgres.addToPhotos(
-              {
+            console.log(newFilePath)
+            postgres.addToPhotos({
                 olc: req.body.olc,
                 filename: newFilePath,
                 date: Date()
               },
               req.session.userid
             );
+            console.log("added to postgres")
             let code = uuidv1();
             let photo = new mongooseModels.photosText({
               localid: req.body.id,
@@ -469,8 +490,7 @@ function api(app, redisclient) {
             for (let recipient of onCallList) {
               twilclient.messages
                 .create({
-                  body:
-                    "Copy this code: " +
+                  body: "Copy this code: " +
                     code +
                     " and reply with Y/N for current user's date:" +
                     req.body.date,
@@ -480,16 +500,28 @@ function api(app, redisclient) {
                 })
                 .then(message => console.log(message.sid));
             }
+            console.log("sent texts")
             await photo.save();
-            res.status(200).json({ success: true });
+            console.log("added to mongo")
+            res.status(200).json({
+              success: true
+            });
           }
         } catch (e) {
-          fs.unlinkSync(newFilePath);
-          res.status(500).json({ success: false });
+          if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path)
+          } else {
+            fs.unlinkSync(newFilePath);
+          }
+          res.status(500).json({
+            success: false
+          });
         }
       } else {
         fs.unlinkSync(req.file.path);
-        res.status(401).json({ success: false });
+        res.status(401).json({
+          success: false
+        });
       }
     }
   );
@@ -498,7 +530,7 @@ function api(app, redisclient) {
     "/imageUpload",
     passport.authMiddleware(redisclient),
     upload.single("image"),
-    async function(req, res, next) {
+    async function (req, res, next) {
       winston.log("warn", "body", req.body);
       if (findExists(req.session.role, levels.user)) {
         try {
@@ -510,7 +542,10 @@ function api(app, redisclient) {
             fs.unlinkSync(req.file.path);
             res
               .status(400)
-              .json({ success: false, error: "file or olc error" });
+              .json({
+                success: false,
+                error: "file or olc error"
+              });
           } else {
             if (req.body.bearing === undefined || req.body.bearing === "") {
               req.body.bearing = 0.0;
@@ -524,8 +559,7 @@ function api(app, redisclient) {
               ".jpg";
             winston.log("error", fs.existsSync(req.file.path));
             fs.renameSync(req.file.path, newFilePath);
-            postgres.addToPhotos(
-              {
+            postgres.addToPhotos({
                 olc: req.body.olc,
                 filename: newFilePath,
                 date: Date()
@@ -540,19 +574,25 @@ function api(app, redisclient) {
               classifications: []
             });
             await photo.save();
-            res.status(200).json({ success: true });
+            res.status(200).json({
+              success: true
+            });
           }
         } catch (e) {
           fs.unlinkSync(req.file.path);
-          res.status(500).json({ success: false });
+          res.status(500).json({
+            success: false
+          });
         }
       } else {
         fs.unlinkSync(req.file.path);
-        res.status(401).json({ success: false });
+        res.status(401).json({
+          success: false
+        });
       }
     }
   );
-  app.get("/areaOLC", passport.authMiddleware(redisclient), async function(
+  app.get("/areaOLC", passport.authMiddleware(redisclient), async function (
     req,
     res,
     next
@@ -598,7 +638,7 @@ function api(app, redisclient) {
               }
             }
           });
-          query.exec(function(err, result) {
+          query.exec(function (err, result) {
             try {
               // winston.log('info', util.inspect(result, {depth: null}));
               let results_to_send;
@@ -627,7 +667,7 @@ function api(app, redisclient) {
               }
             }
           });
-          query.exec(function(err, result) {
+          query.exec(function (err, result) {
             try {
               const time_end_results = new Date().getTime();
               winston.log("warn", "time elapsed in mongo", {
@@ -661,7 +701,7 @@ function api(app, redisclient) {
     }
   });
 
-  app.get("/areaPolygon", passport.authMiddleware(redisclient), function(
+  app.get("/areaPolygon", passport.authMiddleware(redisclient), function (
     req,
     res,
     next
@@ -682,17 +722,16 @@ function api(app, redisclient) {
         const user = req.query.user;
         const lower = [lng1, lat1];
         const upper = [lng2, lat2];
-        const distance = geolib.getDistance(
-          {
-            longitude: lower[0],
-            latitude: upper[1]
-          },
-          {
-            longitude: upper[0],
-            latitude: upper[1]
-          }
-        ); // keep the distance to one dimension
-        winston.log("info", "DISTANCE:", { distance: distance });
+        const distance = geolib.getDistance({
+          longitude: lower[0],
+          latitude: upper[1]
+        }, {
+          longitude: upper[0],
+          latitude: upper[1]
+        }); // keep the distance to one dimension
+        winston.log("info", "DISTANCE:", {
+          distance: distance
+        });
         // diagonal distance in the view
         if (user !== undefined && user === req.session.passport.user) {
           var query = mongooseModels.parents.find({
@@ -718,7 +757,7 @@ function api(app, redisclient) {
               }
             }
           });
-          query.exec(function(err, result) {
+          query.exec(function (err, result) {
             try {
               // winston.log('info', util.inspect(result, {depth: null}));
               let results_to_send;
@@ -747,7 +786,7 @@ function api(app, redisclient) {
               }
             }
           });
-          query.exec(function(err, result) {
+          query.exec(function (err, result) {
             try {
               const time_end_results = new Date().getTime();
               winston.log("warn", "time elapsed in mongo", {
@@ -782,11 +821,11 @@ function api(app, redisclient) {
   });
 }
 
-var findExists = function(needle, haystack) {
+var findExists = function (needle, haystack) {
   return haystack.indexOf(needle) >= 0;
 };
 
-var checkRestr = function(restr) {
+var checkRestr = function (restr) {
   return (
     restr.type !== undefined &&
     checkDurationForType(restr.type, restr.duration) &&
@@ -808,7 +847,7 @@ var checkRestr = function(restr) {
   );
 };
 
-var checkDurationForType = function(type, duration) {
+var checkDurationForType = function (type, duration) {
   if (type == 0 || type == 1) {
     // Short term parking < 1hour (green or metered green)
     return !isNull(duration) && duration < 60;
@@ -826,14 +865,14 @@ var checkDurationForType = function(type, duration) {
   // Otherwise an undefined or null duration is fine
   return true;
 };
-var checkPermitForType = function(type, permit) {
+var checkPermitForType = function (type, permit) {
   if (type == 4) {
     return !isNull(permit) && permit !== "";
   }
   return true;
 };
 
-var checkCostForType = function(type, cost, per) {
+var checkCostForType = function (type, cost, per) {
   if (type == 1 || type == 3 || type == 5) {
     return !isNull(cost) && cost > 0 && per > 0;
   }
@@ -916,7 +955,7 @@ var checkCostForType = function(type, cost, per) {
  * @param points, boolean whether to include lines (sufficiently small enough OLC/polygon size/or just user's points)
  * @returns {Array}
  */
-let processResults = function(results, getLines) {
+let processResults = function (results, getLines) {
   let returnResults = [];
   for (let result in results) {
     let newResponse = {};
