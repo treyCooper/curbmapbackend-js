@@ -31,6 +31,7 @@ var whitelist = [
   "https://curbmap.com",
   "https://curbmap.com:443",
   "http://curbmap.com:8080",
+  "http://localhost:3000",
   "*"
 ];
 var corsOptions = {
