@@ -40,7 +40,13 @@ const upload = multer({
 const passport = require("passport");
 const winston = require("winston");
 const MessagingResponse = require("twilio").twiml.MessagingResponse;
-
+let HOST_RES = "https://curbmap.com:50003/";
+let HOST_AUTH = "https://curbmap.com/";
+if (process.env.ENVIRONMENT === "TEST") {
+  HOST_RES = "http://localhost:8081/";
+  HOST_AUTH = "http://localhost:8080/";
+}
+console.log(process.env);
 function api(app, redisclient) {
   app.get("/uploads/:name", async function(req, res, next) {
     var options = {
@@ -55,13 +61,16 @@ function api(app, redisclient) {
     if (fileName.includes("-text.jpg")) {
       res.sendFile(fileName, options, function(err) {
         if (err) {
-          res.status(404).json({ error: "no file" });
+          res.status(404).json({
+            error: "no file"
+          });
         } else {
           console.log("Sent:", fileName);
         }
       });
-    } else if (!fileName.includes("jpg")) {
+    } else if (fileName.includes("jpg")) {
       sharp(__dirname + "/../uploads/" + fileName)
+        .rotate()
         .resize(800)
         .toBuffer()
         .then(data => {
@@ -69,10 +78,67 @@ function api(app, redisclient) {
           res.end(data);
         })
         .catch(err => {
-          res.status(500).json({ error: "something happened" });
+          res.status(500).json({
+            error: "something happened"
+          });
         });
     }
   });
+
+  app.post("/getPhoto", passport.authMiddleware(redisclient), async function(
+    req,
+    res,
+    next
+  ) {
+    console.log("in getPhoto");
+    try {
+      let avail = await mongooseModels.photos.aggregate([
+        {
+          $match: { "classifications.userid": { $nin: [req.session.userid] } }
+        }
+      ]);
+      let randomImage = Math.round(Math.random() * avail.length);
+      while (
+        randomImage >= avail.length ||
+        !fs.existsSync(__dirname + "/../" + avail[randomImage].filename)
+      ) {
+        if (randomImage < avail.length) {
+          // remove the image from the DB and from the aggregation with slice
+          let removed = await mongooseModels.photos.remove({
+            _id: avail[randomImage]._id
+          });
+          avail.splice(randomImage, 1);
+          winston.log("info", "removed", removed);
+        }
+        randomImage = Math.round(Math.random() * avail.length);
+        winston.log("info", "random image", randomImage);
+      }
+      let fileName = avail[randomImage].filename;
+      let id = avail[randomImage]._id.toString();
+      res.status(200).json({
+        success: true,
+        file: HOST_RES + fileName,
+        id: id
+      });
+    } catch (error) {
+      winston.log("error", "oops error for userid:", req.session.userid, error);
+    }
+  });
+
+  app.post(
+    "/addClassification",
+    passport.authMiddleware(redisclient),
+    async function(req, res, next) {
+      try {
+        if (req.body.boxes === undefined || req.body.boxes.length == 0) {
+          res
+            .status(400)
+            .json({ success: false, error: "Boxes must be defined" });
+          return next();
+        }
+      } catch (error) {}
+    }
+  );
 
   function completeSend(buffer) {}
 
@@ -87,7 +153,9 @@ function api(app, redisclient) {
       typeof req.body.restrictions !== "object" ||
       req.body.restrictions.length == 0
     ) {
-      res.status(400).json({ success: false });
+      res.status(400).json({
+        success: false
+      });
     } else {
       try {
         if (
@@ -148,13 +216,17 @@ function api(app, redisclient) {
               );
             }
           } else {
-            res.status(200).json({ success: false });
+            res.status(200).json({
+              success: false
+            });
           }
         } else {
           let parent_id = mongooseModels.obj_id(req.body.parentid);
 
           let parent = await mongooseModels.parents
-            .findOne({ _id: parent_id })
+            .findOne({
+              _id: parent_id
+            })
             .exec();
           if (parent !== null) {
             parent.lines.push({
@@ -221,7 +293,9 @@ function api(app, redisclient) {
             } else {
               // we didn't add any new restrictions to the new line, so don't save it to the
               // parent line
-              res.status(200).json({ success: false });
+              res.status(200).json({
+                success: false
+              });
             }
           }
         }
@@ -315,11 +389,15 @@ function api(app, redisclient) {
                 }
               }
               await line.save();
-              res.status(200).json({ success: true });
+              res.status(200).json({
+                success: true
+              });
             }
           } catch (err) {
             // couldn't find parent or something went wrong with search
-            res.status(400).json({ success: false });
+            res.status(400).json({
+              success: false
+            });
           }
         } else {
           // Add a restriction to a line with a parent
@@ -327,7 +405,9 @@ function api(app, redisclient) {
             temp_subdocs = {};
             let parent_id = mongooseModels.obj_id(req.body.parentid);
             let the_line_parent = await mongooseModels.parents
-              .findOne({ _id: parent_id })
+              .findOne({
+                _id: parent_id
+              })
               .exec();
             if (the_line_parent !== null) {
               // we found the parent line, now find the sub-line segment
@@ -390,13 +470,17 @@ function api(app, redisclient) {
             }
           } catch (error) {
             // Something happened in the query
-            res.status(400).json({ success: false });
+            res.status(400).json({
+              success: false
+            });
           }
         }
       } else {
         // have to have a line within the parent or on its own to add to. Otherwise, we
         // don't know what line to add to
-        res.status(400).json({ success: false });
+        res.status(400).json({
+          success: false
+        });
       }
     }
   );
@@ -410,7 +494,9 @@ function api(app, redisclient) {
       time: new Date()
     };
     fs.appendFileSync("textmessages.json", JSON.stringify(tempJSON));
-    res.writeHead(200, { "Content-Type": "text/xml" });
+    res.writeHead(200, {
+      "Content-Type": "text/xml"
+    });
     res.end(twilmsg.toString());
   });
 
@@ -431,6 +517,7 @@ function api(app, redisclient) {
             "-text.jpg";
           winston.log("error", fs.existsSync(req.file.path));
           fs.renameSync(req.file.path, newFilePath);
+          winston.log("err", "renamed");
           if (
             req.file.size < 10000 ||
             req.body.olc === undefined ||
@@ -443,10 +530,12 @@ function api(app, redisclient) {
             req.body.token === undefined
           ) {
             fs.unlinkSync(newFilePath);
-            res
-              .status(400)
-              .json({ success: false, error: "file or olc error" });
+            res.status(400).json({
+              success: false,
+              error: "file or olc error"
+            });
           } else {
+            console.log(newFilePath);
             postgres.addToPhotos(
               {
                 olc: req.body.olc,
@@ -455,6 +544,7 @@ function api(app, redisclient) {
               },
               req.session.userid
             );
+            console.log("added to postgres");
             let code = uuidv1();
             let photo = new mongooseModels.photosText({
               localid: req.body.id,
@@ -480,16 +570,28 @@ function api(app, redisclient) {
                 })
                 .then(message => console.log(message.sid));
             }
+            console.log("sent texts");
             await photo.save();
-            res.status(200).json({ success: true });
+            console.log("added to mongo");
+            res.status(200).json({
+              success: true
+            });
           }
         } catch (e) {
-          fs.unlinkSync(newFilePath);
-          res.status(500).json({ success: false });
+          if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+          } else {
+            fs.unlinkSync(newFilePath);
+          }
+          res.status(500).json({
+            success: false
+          });
         }
       } else {
         fs.unlinkSync(req.file.path);
-        res.status(401).json({ success: false });
+        res.status(401).json({
+          success: false
+        });
       }
     }
   );
@@ -508,9 +610,10 @@ function api(app, redisclient) {
             req.body.olc === ""
           ) {
             fs.unlinkSync(req.file.path);
-            res
-              .status(400)
-              .json({ success: false, error: "file or olc error" });
+            res.status(400).json({
+              success: false,
+              error: "file or olc error"
+            });
           } else {
             if (req.body.bearing === undefined || req.body.bearing === "") {
               req.body.bearing = 0.0;
@@ -540,15 +643,21 @@ function api(app, redisclient) {
               classifications: []
             });
             await photo.save();
-            res.status(200).json({ success: true });
+            res.status(200).json({
+              success: true
+            });
           }
         } catch (e) {
           fs.unlinkSync(req.file.path);
-          res.status(500).json({ success: false });
+          res.status(500).json({
+            success: false
+          });
         }
       } else {
         fs.unlinkSync(req.file.path);
-        res.status(401).json({ success: false });
+        res.status(401).json({
+          success: false
+        });
       }
     }
   );
@@ -692,7 +801,9 @@ function api(app, redisclient) {
             latitude: upper[1]
           }
         ); // keep the distance to one dimension
-        winston.log("info", "DISTANCE:", { distance: distance });
+        winston.log("info", "DISTANCE:", {
+          distance: distance
+        });
         // diagonal distance in the view
         if (user !== undefined && user === req.session.passport.user) {
           var query = mongooseModels.parents.find({
