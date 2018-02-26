@@ -19,7 +19,7 @@ const levels = {
   admin: ["ROLE_ADMIN", "ROLE_OWNER"],
   owner: ["ROLE_OWNER"]
 };
-const maxSize = 6 * 1000 * 1000;
+const maxSize = 20 * 1000 * 1000;
 const multer = require("multer");
 
 var storage = multer.diskStorage({
@@ -589,6 +589,7 @@ function api(app, redisclient) {
     passport.authMiddleware(redisclient),
     upload.single("image"),
     async function(req, res, next) {
+      console.log("here")
       if (findExists(req.session.role, levels.user)) {
         try {
           if (
