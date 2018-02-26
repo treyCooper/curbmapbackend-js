@@ -537,7 +537,6 @@ function api(app, redisclient) {
               error: "file or olc error"
             });
           } else {
-            console.log(newFilePath);
             let photo = new mongooseModels.photosText({
               localid: req.body.id,
               userid: req.session.userid,
@@ -552,18 +551,16 @@ function api(app, redisclient) {
                 .create({
                   body:
                     "Copy this code: " +
-                    photo._id +
-                    " and reply with Y/N for current user's date:" +
+                    photo._id.toString() +
+                    " and reply with <Y/N> <Until what time> <on what date>" +
                     req.body.date,
                   to: recipient,
                   from: "+12132635292",
                   mediaUrl: "https://curbmap.com:50003/" + newFilePath
                 })
-                .then(message => console.log(message.sid));
+                .then(message => winston.log('info', "MESSAGE SID:", message.sid));
             }
-            console.log("sent texts");
             await photo.save();
-            console.log("added to mongo");
             res.status(200).json({
               success: true
             });
