@@ -102,6 +102,7 @@ function api(app, redisclient) {
         randomImage >= avail.length ||
         !fs.existsSync(__dirname + "/../" + avail[randomImage].filename)
       ) {
+        winston.log("error", __dirname, randomImage, avail[randomImage]);
         if (randomImage < avail.length) {
           // remove the image from the DB and from the aggregation with slice
           let removed = await mongooseModels.photos.remove({
@@ -110,6 +111,7 @@ function api(app, redisclient) {
           avail.splice(randomImage, 1);
           winston.log("info", "removed", removed);
         }
+        // pick a new number, hopefully from the values we actually have in the list
         randomImage = Math.round(Math.random() * avail.length);
         winston.log("info", "random image", randomImage);
       }
@@ -536,20 +538,9 @@ function api(app, redisclient) {
             });
           } else {
             console.log(newFilePath);
-            postgres.addToPhotos(
-              {
-                olc: req.body.olc,
-                filename: newFilePath,
-                date: Date()
-              },
-              req.session.userid
-            );
-            console.log("added to postgres");
-            let code = uuidv1();
             let photo = new mongooseModels.photosText({
               localid: req.body.id,
               userid: req.session.userid,
-              code,
               filename: newFilePath,
               token: req.body.token,
               date: Date(),
@@ -561,7 +552,7 @@ function api(app, redisclient) {
                 .create({
                   body:
                     "Copy this code: " +
-                    code +
+                    photo._id +
                     " and reply with Y/N for current user's date:" +
                     req.body.date,
                   to: recipient,
@@ -601,7 +592,6 @@ function api(app, redisclient) {
     passport.authMiddleware(redisclient),
     upload.single("image"),
     async function(req, res, next) {
-      winston.log("warn", "body", req.body);
       if (findExists(req.session.role, levels.user)) {
         try {
           if (
@@ -625,7 +615,6 @@ function api(app, redisclient) {
               "-" +
               req.body.bearing +
               ".jpg";
-            winston.log("error", fs.existsSync(req.file.path));
             fs.renameSync(req.file.path, newFilePath);
             postgres.addToPhotos(
               {
@@ -648,6 +637,7 @@ function api(app, redisclient) {
             });
           }
         } catch (e) {
+          winston.log("error", e);
           fs.unlinkSync(req.file.path);
           res.status(500).json({
             success: false
