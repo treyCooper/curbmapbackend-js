@@ -11,6 +11,7 @@ const uuidv1 = require("uuid/v1");
 const twilio = require("twilio");
 const sharp = require("sharp");
 const twilclient = new twilio(process.env.TWILIOSID, process.env.TWILIOAUTH);
+const apn = require("apn");
 
 const onCallList = process.env.ONCALLLIST.split(",");
 
@@ -19,7 +20,7 @@ const levels = {
   admin: ["ROLE_ADMIN", "ROLE_OWNER"],
   owner: ["ROLE_OWNER"]
 };
-const maxSize = 6 * 1000 * 1000;
+const maxSize = 20 * 1000 * 1000;
 const multer = require("multer");
 
 var storage = multer.diskStorage({
@@ -37,14 +38,24 @@ const upload = multer({
   },
   storage: storage
 });
+
+let apnOptions = {
+  token: {
+    key: "../apn_cert.p8",
+    keyId: "N36MRYQ382",
+    teamId: "CNKFCAS44G"
+  }
+};
+let apnProvider = new apn.Provider(apnOptions);
+
 const passport = require("passport");
 const winston = require("winston");
 const MessagingResponse = require("twilio").twiml.MessagingResponse;
 let HOST_RES = "https://curbmap.com:50003/";
 let HOST_AUTH = "https://curbmap.com/";
 if (process.env.ENVIRONMENT === "TEST") {
-  HOST_RES = "http://localhost:8081/";
-  HOST_AUTH = "http://localhost:8080/";
+  HOST_RES = "https://27e0c8fb.ngrok.io/";
+  HOST_AUTH = "https://6b890315.ngrok.io/";
 }
 console.log(process.env);
 function api(app, redisclient) {
@@ -69,22 +80,38 @@ function api(app, redisclient) {
         }
       });
     } else if (fileName.includes("jpg")) {
-      sharp(__dirname + "/../uploads/" + fileName)
+      sharp(fileName)
         .rotate()
         .resize(800)
         .toBuffer()
-        .then(data => {
-          res.contentType("jpeg");
-          res.end(data);
+        .then(fileBuffer => {
+          return res.status(200).json({
+            success: true,
+            image: "data:image/jpeg;base64," + fileBuffer.toString("base64")
+          });
         })
         .catch(err => {
-          res.status(500).json({
-            error: "something happened"
-          });
+          return res.status(500).json({ error: "No file or error" });
         });
     }
   });
-
+  app.post("/postRects", passport.authMiddleware(redisclient), async function(
+    req,
+    res,
+    next
+  ) {
+    let photo = await mongooseModels.photos.findOne({
+      _id: mongooseModels.obj_id(req.body.id)
+    });
+    photo.classifications.push({
+      userid: req.session.userid,
+      type: 0,
+      boxes: constructBoxesFrom(req.body.boxes),
+      content: [],
+      date: new Date()
+    });
+    await photo.save();
+  });
   app.post("/getPhoto", passport.authMiddleware(redisclient), async function(
     req,
     res,
@@ -97,31 +124,43 @@ function api(app, redisclient) {
           $match: { "classifications.userid": { $nin: [req.session.userid] } }
         }
       ]);
-      let randomImage = Math.round(Math.random() * avail.length);
-      while (
-        randomImage >= avail.length ||
-        !fs.existsSync(__dirname + "/../" + avail[randomImage].filename)
-      ) {
-        winston.log("error", __dirname, randomImage, avail[randomImage]);
-        if (randomImage < avail.length) {
-          // remove the image from the DB and from the aggregation with slice
-          let removed = await mongooseModels.photos.remove({
-            _id: avail[randomImage]._id
-          });
-          avail.splice(randomImage, 1);
-          winston.log("info", "removed", removed);
+      if (avail.length === 0) {
+        res.status(200).json({ success: true, error: "no more photos" });
+      } else {
+        let randomImage = Math.round(Math.random() * avail.length);
+        while (
+          randomImage >= avail.length ||
+          !fs.existsSync(__dirname + "/../" + avail[randomImage].filename)
+        ) {
+          winston.log("error", __dirname, randomImage, avail[randomImage]);
+          if (randomImage < avail.length) {
+            // remove the image from the DB and from the aggregation with slice
+            let removed = await mongooseModels.photos.remove({
+              _id: avail[randomImage]._id
+            });
+            avail.splice(randomImage, 1);
+            winston.log("info", "removed", removed);
+          }
+          // pick a new number, hopefully from the values we actually have in the list
+          randomImage = Math.round(Math.random() * avail.length);
+          winston.log("info", "random image", randomImage);
         }
-        // pick a new number, hopefully from the values we actually have in the list
-        randomImage = Math.round(Math.random() * avail.length);
-        winston.log("info", "random image", randomImage);
+        sharp(__dirname + "/../" + avail[randomImage].filename)
+          .rotate()
+          .resize(800)
+          .toBuffer()
+          .then(fileBuffer => {
+            let id = avail[randomImage]._id.toString();
+            return res.status(200).json({
+              success: true,
+              image: "data:image/jpeg;base64," + fileBuffer.toString("base64"),
+              id: id
+            });
+          })
+          .catch(err => {
+            return res.status(500).json({ error: "No file or error" });
+          });
       }
-      let fileName = avail[randomImage].filename;
-      let id = avail[randomImage]._id.toString();
-      res.status(200).json({
-        success: true,
-        file: HOST_RES + fileName,
-        id: id
-      });
     } catch (error) {
       winston.log("error", "oops error for userid:", req.session.userid, error);
     }
@@ -487,9 +526,59 @@ function api(app, redisclient) {
     }
   );
 
-  app.post("/getdatafromtext", function(req, res, next) {
+  app.post("/respondFromText", async function(req, res, next) {
+    let body = req.body.Body.split(" ");
+    console.log(req.body);
+    if (
+      [2, 3, 4, 5].includes(body.length) &&
+      mongooseModels.obj_id.isValid(body[0]) &&
+      ["Y", "N"].includes(body[1])
+    ) {
+      // correct length and probably correct message
+      try {
+        let respText = await mongooseModels.photosText.findOne({
+          _id: mongooseModels.obj_id(body[0])
+        });
+        let untilDate = new Date(
+          body[3] + " " + body[2] + " " + respText.timezone
+        );
+        respText.responses.push({
+          from: req.body.From,
+          date: new Date(),
+          canPark: body[1] === "Y",
+          until: body[1] === "Y" ? untilDate : null,
+          permit:
+            body.length === 5 ? body[4] : body.length === 3 ? body[2] : null // if exists otherwise null
+        });
+        let notification = new apn.Notification();
+        notification.expiry = Math.floor(Date.now() / 1000) + 24 * 3600;
+        notification.badge = 2;
+        if (body[1] === "Y") {
+          notification.alert =
+            "You can park at the spot you just uploaded a photo for, until: " +
+            untilDate +
+            " unless you have permit:" +
+            body[4];
+        } else {
+          if (body.length === 3) {
+            notification.alert =
+              "You can only park there if you have permit: " + body[2];
+          } else {
+            notification.alert =
+              "It's best if you do not park at the location you just photographed.";
+          }
+        }
+        notification.topic = "com.curbmap.curbmap";
+        notification.sound = "ping.aiff";
+        notification.payload = { messageFrom: "curbmap" };
+        let result = await apnProvider.send(notification, respText.token);
+        console.log(result);
+        respText.save();
+      } catch (err) {}
+    }
     var twilmsg = new MessagingResponse();
     twilmsg.message("success! Thanks for making curbmap better!");
+    twilclient;
     const tempJSON = {
       from: req.body.From,
       body: req.body.Body,
@@ -542,23 +631,26 @@ function api(app, redisclient) {
               userid: req.session.userid,
               filename: newFilePath,
               token: req.body.token,
+              timezone: req.body.timezone,
               date: Date(),
               size: req.file.size,
-              canPark: false
+              responses: []
             });
             for (let recipient of onCallList) {
               twilclient.messages
                 .create({
                   body:
-                    "Copy this code: " +
+                    "Copy this code: \n" +
                     photo._id.toString() +
-                    " and reply with <Y/N> <Until what time> <on what date>" +
+                    "\n and reply with\n <Y/N> <Until what time> <on what date>" +
                     req.body.date,
                   to: recipient,
                   from: "+12132635292",
-                  mediaUrl: "https://curbmap.com:50003/" + newFilePath
+                  mediaUrl: HOST_RES + newFilePath
                 })
-                .then(message => winston.log('info', "MESSAGE SID:", message.sid));
+                .then(message =>
+                  winston.log("info", "MESSAGE SID:", message.sid)
+                );
             }
             await photo.save();
             res.status(200).json({
@@ -589,6 +681,7 @@ function api(app, redisclient) {
     passport.authMiddleware(redisclient),
     upload.single("image"),
     async function(req, res, next) {
+      console.log("here");
       if (findExists(req.session.role, levels.user)) {
         try {
           if (
@@ -879,9 +972,23 @@ function api(app, redisclient) {
     }
   });
 }
-
 var findExists = function(needle, haystack) {
   return haystack.indexOf(needle) >= 0;
+};
+
+var constructBoxesFrom = function(boxes) {
+  let newBoxes = [];
+  for (box of boxes) {
+    console.log(box);
+    newBoxes.push({
+      origin_x: box.x,
+      origin_y: box.y,
+      width: box.width,
+      height: box.height,
+      categories: [box.type.key]
+    });
+  }
+  return newBoxes;
 };
 
 var checkRestr = function(restr) {
