@@ -78,16 +78,15 @@ const PhotosSchema = new mongoose.Schema(
   },
   { collection: "Photos" }
 );
-/*
-              localid: req.body.id,
-              userid: req.session.userid,
-              code,
-              filename: newFilePath,
-              token: req.body.token,
-              date: Date(),
-              size: req.file.size,
-              canpark: false
-*/
+
+const ResponseToTextSchema = new mongoose.Schema({
+  from: String,
+  date: Date,
+  canPark: Boolean,
+  until: Date,
+  permit: String
+});
+
 const PhotosTextSchema = new mongoose.Schema(
   {
     userid: {
@@ -97,12 +96,12 @@ const PhotosTextSchema = new mongoose.Schema(
     localid: {
       type: String
     },
-    code: String,
     token: String,
     filename: String,
     date: Date,
+    timezone: String,
     size: Number,
-    canPark: Boolean
+    responses: [ResponseToTextSchema]
   },
   { collection: "PhotosText" }
 );
