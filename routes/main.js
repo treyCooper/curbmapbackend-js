@@ -100,6 +100,7 @@ function api(app, redisclient) {
     res,
     next
   ) {
+    try {
     let photo = await mongooseModels.photos.findOne({
       _id: mongooseModels.obj_id(req.body.id)
     });
@@ -111,6 +112,10 @@ function api(app, redisclient) {
       date: new Date()
     });
     await photo.save();
+    res.status(200).json({success: true});
+  } catch(err) {
+    res.status(500).json({success: false})
+  }
   });
   app.post("/getPhoto", passport.authMiddleware(redisclient), async function(
     req,
@@ -125,8 +130,9 @@ function api(app, redisclient) {
         }
       ]);
       if (avail.length === 0) {
-        res.status(200).json({ success: true, error: "no more photos" });
+        res.status(200).json({ success: false, error: "no more photos" });
       } else {
+        winston.log("error", "avail", avail.length);
         let randomImage = Math.round(Math.random() * avail.length);
         while (
           randomImage >= avail.length ||
