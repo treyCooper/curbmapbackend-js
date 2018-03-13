@@ -93,6 +93,17 @@ function api(app, redisclient) {
         .catch(err => {
           return res.status(500).json({ error: "No file or error" });
         });
+    } else if (fileName.includes("bz2")){
+      // the bz2 files
+      res.sendFile(fileName, options, function(err) {
+        if (err) {
+          res.status(404).json({
+            error: "no file"
+          });
+        } else {
+          console.log("Sent:", fileName);
+        }
+      });
     }
   });
   app.post("/postRects", passport.authMiddleware(redisclient), async function(
