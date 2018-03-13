@@ -167,6 +167,7 @@ function api(app, redisclient) {
           // pick a new number, hopefully from the values we actually have in the list
           randomImage = Math.round(Math.random() * avail.length);
           winston.log("info", "random image", randomImage);
+          i += 1
         }
         sharp(__dirname + "/../" + avail[randomImage].filename)
           .rotate()
