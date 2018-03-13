@@ -93,7 +93,7 @@ function api(app, redisclient) {
         .catch(err => {
           return res.status(500).json({ error: "No file or error" });
         });
-    } else if (fileName.includes("bz2")){
+    } else if (fileName.includes("bz2")) {
       // the bz2 files
       res.sendFile(fileName, options, function(err) {
         if (err) {
@@ -112,21 +112,21 @@ function api(app, redisclient) {
     next
   ) {
     try {
-    let photo = await mongooseModels.photos.findOne({
-      _id: mongooseModels.obj_id(req.body.id)
-    });
-    photo.classifications.push({
-      userid: req.session.userid,
-      type: 0,
-      boxes: constructBoxesFrom(req.body.boxes),
-      content: [],
-      date: new Date()
-    });
-    await photo.save();
-    res.status(200).json({success: true});
-  } catch(err) {
-    res.status(500).json({success: false})
-  }
+      let photo = await mongooseModels.photos.findOne({
+        _id: mongooseModels.obj_id(req.body.id)
+      });
+      photo.classifications.push({
+        userid: req.session.userid,
+        type: 0,
+        boxes: constructBoxesFrom(req.body.boxes),
+        content: [],
+        date: new Date()
+      });
+      await photo.save();
+      res.status(200).json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false });
+    }
   });
   app.post("/getPhoto", passport.authMiddleware(redisclient), async function(
     req,
@@ -145,10 +145,16 @@ function api(app, redisclient) {
       } else {
         winston.log("error", "avail", avail.length);
         let randomImage = Math.round(Math.random() * avail.length);
+        let i = 0;
         while (
           randomImage >= avail.length ||
           !fs.existsSync(__dirname + "/../" + avail[randomImage].filename)
         ) {
+          if (i >= 5) {
+            return res
+              .status(200)
+              .json({ success: false, error: "no more photos" });
+          }
           winston.log("error", __dirname, randomImage, avail[randomImage]);
           if (randomImage < avail.length) {
             // remove the image from the DB and from the aggregation with slice
