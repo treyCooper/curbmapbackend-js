@@ -165,6 +165,17 @@ function addToPhotos(newValue, userid, res) {
     });
 }
 
+function addPointsToUser (userId, points) {
+  return User.findById(userId)
+  .then(user => {
+    user.update({
+      score: (user.score + 50),
+      updatedAt: new Date()
+    })
+  })
+
+}
+
 module.exports = {
   User: User,
   Line: Line,
