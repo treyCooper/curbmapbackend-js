@@ -136,7 +136,7 @@ function addToLines(newValue, userid, res) {
 }
 
 function addToPhotos(newValue, userid, res) {
-  Photo.findOne({
+  return Photo.findOne({
     where: {
       userid: userid
     }
@@ -159,7 +159,9 @@ function addToPhotos(newValue, userid, res) {
         return Photo.create({ userid: userid, photos_created: [newValue] });
       }
     })
-    .then(updatedUser => {})
+    .then(updatedUser => {
+      return addPointsToUser(updatedUser.id, 50)
+    })
     .catch(error => {
       console.log(error);
     });
@@ -168,10 +170,14 @@ function addToPhotos(newValue, userid, res) {
 function addPointsToUser (userId, points) {
   return User.findById(userId)
   .then(user => {
-    user.update({
-      score: (user.score + 50),
+    return user.update({
+      score: (user.score + points),
       updatedAt: new Date()
     })
+    .then(userWithAddedPoints => userWithAddedPoints.score)
+  })
+  .catch(error => {
+    console.log(error)
   })
 
 }
